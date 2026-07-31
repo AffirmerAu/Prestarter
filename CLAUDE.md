@@ -8,7 +8,7 @@ Prestarter is a subscription platform that licenses Affirmer's 3D animated safet
 clients. Clients copy embed links or download QR codes and place them in their own systems. No LMS,
 no quizzing, no per-worker accounts.
 
-Hosted at `prestarter.affirmer.com.au`. Full specification: `docs/spec.md`. Decision history: `docs/decisions.md`.
+Hosted at `prestarter.au`. Full specification: `docs/spec.md`. Decision history: `docs/decisions.md`.
 
 ## Working agreement
 

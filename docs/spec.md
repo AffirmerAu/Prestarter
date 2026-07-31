@@ -1,6 +1,6 @@
 # Prestarter — build specification
 
-Safety video licence platform · prestarter.affirmer.com.au
+Safety video licence platform · prestarter.au
 
 **Status:** draft for review · **Owner:** Matt, Affirmer Pty Limited · **Revised:** 31 July 2026
 
@@ -66,7 +66,7 @@ transport and healthcare.
 | D3 | New voice and music recorded for all catalogue content; Affirmer owns it outright |
 | D4 | Packaged as industry packs plus per-course add-ons ⚠ see 3.1 |
 | D5 | URLs carry an opaque stable video ID, never the human-readable code |
-| D6 | **Revised.** Served from `prestarter.affirmer.com.au`, a subdomain of the main site |
+| D6 | **Revised.** Served from `prestarter.au`, a dedicated domain |
 | D7 | Twelve-month term from start date; reminders at 60 and 30 days |
 | D8 | Fee is metered on plays, calculated **outside** the system ⚠ see 3.1 |
 | D9 | Daily cap is advisory — it alerts the administrator only, never blocks, never shown to clients |
@@ -119,11 +119,11 @@ exhaustion should also warn the client, specify the wording, since it cannot inc
 | Auth | Supabase Auth, email magic link | Client and staff sign-in |
 | Video | Cloudflare Stream, signed URLs required on every video | Encoding, adaptive streaming, captions, delivery |
 | Token service | Cloudflare Worker | Entitlement checks, cap accounting, token signing |
-| Player | Static page on `prestarter.affirmer.com.au` | Playback, watermark overlay, caption language selection |
+| Player | Static page on `prestarter.au` | Playback, watermark overlay, caption language selection |
 | Email | Resend | Magic links, onboarding, admin alerts, renewal and overdue notices |
 
 **Non-negotiable:** clients never receive a Cloudflare Stream URL. They receive links to
-`prestarter.affirmer.com.au` carrying their access key. The player requests a token at playback time.
+`prestarter.au` carrying their access key. The player requests a token at playback time.
 
 ---
 
@@ -368,7 +368,7 @@ counts, remaining allowance, cost, or any figure derived from usage.
 ## 12. QR codes and poster export
 
 **QR codes**
-- Encode `https://prestarter.affirmer.com.au/w/{video_id}?k={access_key}&src=poster`, plus `&lang=` where a
+- Encode `https://prestarter.au/w/{video_id}?k={access_key}&src=poster`, plus `&lang=` where a
   language is selected.
 - Pure black on pure white, four-module quiet zone. No tinting, rounding, or embedded logo — these
   reduce scan reliability on laminated signage.
@@ -513,10 +513,13 @@ The build is not done until all of these pass.
 
 - Section 3.1 A and B — packaging wording, and what triggers "renewal approaching".
 - D27 and D28 — success measure and stop condition, to be agreed with James.
-- **One host or two.** `prestarter.affirmer.com.au` currently serves both the portal and playback.
+- **One host or two.** `prestarter.au` currently serves both the portal and playback.
   Bind `/w/*` and `/e/*` directly to the Worker so a failed Pages deployment cannot stop video
   already embedded in client systems. If playback should live on its own host instead, decide before
   the first poster is printed — QR codes encode the player host permanently.
+- **Affirmer association.** The domain no longer carries the Affirmer name, so a worker scanning a
+  QR code on a fence sees an unfamiliar domain. Poster branding and the player page must carry the
+  Affirmer mark to establish provenance.
 - **Trade mark clearance.** PRESTART is filed as a software mark by Australian entities in adjacent
   categories. Search IP Australia in classes 41, 9 and 42 before printing any poster.
 - Grace period default — currently 14 days.
