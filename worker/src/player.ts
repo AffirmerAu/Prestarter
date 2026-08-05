@@ -45,14 +45,20 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     background: #000;
     overflow: hidden;
   }
-  #container.fake-fullscreen {
-    position: fixed;
-    inset: 0;
-    max-width: none;
+  #container:focus { outline: none; }
+  /* While the gate is open there's no video playing yet to preserve an aspect ratio for —
+     on a tall/narrow portrait phone the strict 16:9 box becomes a ~200px strip, nowhere near
+     enough room for the gate's header + grid + footer, and the content gets clipped by this
+     element's own overflow:hidden (confirmed on a real iPhone, not just narrow-viewport
+     testing). Expand to the full viewport only for this pre-play moment; shrinks back to the
+     normal 16:9 box the instant playback actually starts (hideGate()). */
+  #container.gate-open {
     width: 100vw;
     height: 100vh;
     aspect-ratio: unset;
-    z-index: 2147483647;
+  }
+  @supports (height: 100dvh) {
+    #container.gate-open { height: 100dvh; }
   }
   video {
     width: 100%;
@@ -75,55 +81,206 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     user-select: none;
     white-space: nowrap;
   }
-  #controls {
+  #bigPlayButton {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    border: 2px solid rgba(255,255,255,0.85);
+    color: #fff;
+    font-size: 32px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.6));
-  }
-  #controls button {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 16px;
+    justify-content: center;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 0;
+    /* Glyph's own whitespace makes it look left-of-centre otherwise. */
+    padding-left: 6px;
   }
-  #exitFakeFullscreen {
-    display: none;
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 1;
-    background: rgba(0,0,0,0.5);
-    border: none;
-    color: #fff;
-    font-size: 16px;
-    padding: 6px 10px;
-    border-radius: 4px;
-  }
-  #container.fake-fullscreen #exitFakeFullscreen { display: block; }
+  #bigPlayButton:hover { background: rgba(0,0,0,0.7); }
   #denied {
     color: #fff;
     font-family: system-ui, sans-serif;
     padding: 24px;
     text-align: center;
   }
+
+  /* Language gate — pre-play overlay (spec: "caption language gate"). Fills the player box,
+     never position:fixed, so it stays correct inside the iframe-embed format too. */
+  #gate {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    flex-direction: column;
+    /* Solid wash, no gradient/blur — deliberate: this audience is disproportionately on
+       low-end Android outdoors, where backdrop-filter has a real, visible paint cost. */
+    background: rgba(0,0,0,0.6);
+    font-family: system-ui, sans-serif;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+  }
+  #gate.gateDismissing { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #gate { transition: none; }
+  }
+  #gateHeader {
+    flex: 0 0 auto;
+    padding: 20px 16px 12px;
+    text-align: center;
+    color: #fff;
+  }
+  #gateIcon { font-size: 22px; margin-bottom: 4px; }
+  #gateTitle {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: 700;
+    text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
+  }
+  #gateSubtitle {
+    margin: 0;
+    font-size: 12px;
+    opacity: 0.85;
+    text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
+  }
+  #gateGrid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 4px 16px;
+    align-content: start;
+  }
+  @media (min-width: 480px) {
+    #gateGrid { grid-template-columns: repeat(3, 1fr); }
+  }
+  .gateCell {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+  }
+  /* Suggested (locale-matched) language — solid fill and weight alone signal "primary",
+     deliberately no badge (spec: "visibly the primary option without a badge"). */
+  .gateCell.suggested {
+    background: #fff;
+    color: #111;
+    border-color: #fff;
+    font-weight: 600;
+  }
+  .gateCell:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+  }
+  #gateFooter {
+    flex: 0 0 auto;
+    border-top: 1px solid rgba(255,255,255,0.25);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  #gateSkip {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  #gateSkip:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+  }
+  .gateSkipCircle {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    padding-left: 3px;
+  }
+
+  /* Returning-viewer chip — brief, dismissible, non-modal (spec state 3). */
+  #gateChip {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: rgba(20,20,20,0.92);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-family: system-ui, sans-serif;
+    font-size: 12px;
+    color: #fff;
+    max-width: calc(100% - 32px);
+  }
+  #gateChipText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #gateChangeBtn {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    color: #7dd3fc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px;
+    text-decoration: underline;
+  }
+  #gateChangeBtn:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
-  <div id="container">
+  <div id="container" tabindex="-1">
     <video id="video" playsinline></video>
     <div id="watermark"></div>
-    <button id="exitFakeFullscreen" aria-label="Exit fullscreen">&times;</button>
-    <div id="controls">
-      <button id="playPause" aria-label="Play">&#9658;</button>
-      <button id="fullscreen" aria-label="Fullscreen">&#9974;</button>
+    <button id="bigPlayButton" aria-label="Play">&#9658;</button>
+    <div id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <div id="gateHeader">
+        <div id="gateIcon" aria-hidden="true">&#127760;</div>
+        <h2 id="gateTitle">Select your language</h2>
+        <p id="gateSubtitle">Seleccione su idioma &middot; &#36873;&#25321;&#35821;&#35328; &middot; &#2349;&#2366;&#2359;&#2366; &#2330;&#2369;&#2344;&#2375;&#2306;</p>
+      </div>
+      <div id="gateGrid" role="group" aria-label="Available languages"></div>
+      <div id="gateFooter">
+        <button id="gateSkip" type="button">
+          <span class="gateSkipCircle" aria-hidden="true">&#9658;</span>
+          <span>Skip &mdash; play without captions</span>
+        </button>
+      </div>
+    </div>
+    <div id="gateChip" role="status">
+      <span id="gateChipText"></span>
+      <button id="gateChangeBtn" type="button">change</button>
     </div>
   </div>
   <script>
@@ -132,18 +289,63 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     var ACCESS_KEY = ${JSON.stringify(safeAccessKey)};
     var LANG = ${JSON.stringify(safeLang)};
     var STREAM_CUSTOMER_CODE = ${JSON.stringify(streamCustomerCode)};
+    var STORAGE_KEY = "prestarter:captionLang";
 
     var container = document.getElementById("container");
     var video = document.getElementById("video");
     var watermark = document.getElementById("watermark");
-    var playPauseBtn = document.getElementById("playPause");
-    var fullscreenBtn = document.getElementById("fullscreen");
-    var exitFakeFullscreenBtn = document.getElementById("exitFakeFullscreen");
+    var bigPlayButton = document.getElementById("bigPlayButton");
+    var gate = document.getElementById("gate");
+    var gateGrid = document.getElementById("gateGrid");
+    var gateSkip = document.getElementById("gateSkip");
+    var gateChip = document.getElementById("gateChip");
+    var gateChipText = document.getElementById("gateChipText");
+    var gateChangeBtn = document.getElementById("gateChangeBtn");
+
+    var availableLanguages = []; // [{languageTag, labelNative, isDefault}], reviewed only
+    var currentCaptionLang = null; // BCP-47 tag, or null for captions off
+    var started = false; // true once beginPlayback() has been invoked (idempotent past that)
 
     var issuedAtMs = null;
     // Set from the token response — resolved server-side from the access key at request
     // time, not baked into the page, since which client this is isn't known until then.
     var markAs = "";
+
+    // Endonyms, not English names — a viewer who needs the Mandarin track cannot necessarily
+    // read the word "Chinese". Keyed by BCP-47 primary subtag. Intl.DisplayNames is only a
+    // fallback for anything not in this table, logged so the table can grow.
+    var ENDONYMS = {
+      en: "English", es: "Espa\\u00f1ol", zh: "\\u4e2d\\u6587", ko: "\\ud55c\\uad6d\\uc5b4",
+      tl: "Tagalog", vi: "Ti\\u1ebfng Vi\\u1ec7t", hi: "\\u0939\\u093f\\u0928\\u094d\\u0926\\u0940",
+      ar: "\\u0627\\u0644\\u0639\\u0631\\u0628\\u064a\\u0629", pt: "Portugu\\u00eas",
+      ne: "\\u0928\\u0947\\u092a\\u093e\\u0932\\u0940", pa: "\\u0a2a\\u0a70\\u0a1c\\u0a3e\\u0a2c\\u0a40",
+      id: "Bahasa Indonesia",
+    };
+    function endonymFor(tag) {
+      var base = (tag || "").split("-")[0].toLowerCase();
+      if (ENDONYMS[base]) return ENDONYMS[base];
+      try {
+        var dn = new Intl.DisplayNames([navigator.language || "en"], { type: "language" });
+        var name = dn.of(tag);
+        if (name && name.toLowerCase() !== base) {
+          console.warn('[prestarter] no endonym mapped for "' + tag + '" \\u2014 using Intl.DisplayNames fallback "' + name + '". Add it to the ENDONYMS table in player.ts.');
+          return name;
+        }
+      } catch (e) {}
+      console.warn('[prestarter] no endonym or Intl.DisplayNames result for language tag "' + tag + '".');
+      return tag;
+    }
+
+    // Wrapped in try/catch: this player also loads inside a client's own cross-origin
+    // <iframe> embed (the portal's "Iframe embed" link format), where some browsers
+    // partition or block third-party storage entirely. Falling back to "no persisted
+    // preference" there is fine; throwing and breaking the whole player is not.
+    function readStoredLang() {
+      try { return window.localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+    }
+    function writeStoredLang(value) {
+      try { window.localStorage.setItem(STORAGE_KEY, value); } catch (e) {}
+    }
 
     function pad(n) { return n < 10 ? "0" + n : "" + n; }
 
@@ -173,12 +375,89 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
       return res.json();
     }
 
+    // Read-only: populates the gate without minting a Stream token or recording a play event
+    // (see worker/src/index.ts handleLanguagesRequest) — the real /api/token call, and the
+    // play event that comes with it, only happens once the viewer actually taps something.
+    async function fetchLanguages() {
+      try {
+        var qs = "videoId=" + encodeURIComponent(VIDEO_ID) + "&k=" + encodeURIComponent(ACCESS_KEY);
+        var res = await fetch("/api/languages?" + qs);
+        if (!res.ok) return [];
+        var body = await res.json();
+        return body.languages || [];
+      } catch (e) {
+        // Not blocking — the real entitlement check still happens in full when playback is
+        // actually attempted (fetchToken, above). A bad/expired key just won't show a gate.
+        console.error("[prestarter] failed to load caption languages", e);
+        return [];
+      }
+    }
+
     function showDenied(message) {
       container.innerHTML = '<div id="denied">' + message + "</div>";
     }
 
     function buildManifestUrl(token) {
       return "https://customer-" + STREAM_CUSTOMER_CODE + ".cloudflarestream.com/" + token + "/manifest/video.m3u8";
+    }
+
+    // Spec section 8 selection order: ?lang= link param, then browser/device locale, then
+    // the track flagged is_default, then no captions. Used both for the <2-language "nothing
+    // to gate on" case and to re-derive a sane selection if resolution is ever re-run.
+    function pickInitialLanguage(languages) {
+      if (!languages.length) return null;
+      if (LANG) {
+        var exact = languages.filter(function (l) { return l.languageTag === LANG; })[0];
+        if (exact) return exact.languageTag;
+      }
+      var nav = (navigator.language || "").toLowerCase();
+      var navPrimary = nav.split("-")[0];
+      var localeMatch = languages.filter(function (l) {
+        var tag = l.languageTag.toLowerCase();
+        return tag === nav || tag.split("-")[0] === navPrimary;
+      })[0];
+      if (localeMatch) return localeMatch.languageTag;
+      var def = languages.filter(function (l) { return l.isDefault; })[0];
+      return def ? def.languageTag : null;
+    }
+
+    // Locale match ONLY (no ?lang=, no is_default) — used purely to decide which gate cell
+    // gets the "suggested" treatment. Never auto-skips the gate on its own.
+    function computeSuggestedTag(languages) {
+      var nav = (navigator.language || "").toLowerCase();
+      var navPrimary = nav.split("-")[0];
+      var match = languages.filter(function (l) {
+        var tag = l.languageTag.toLowerCase();
+        return tag === nav || tag.split("-")[0] === navPrimary;
+      })[0];
+      return match ? match.languageTag : null;
+    }
+
+    // Cloudflare Stream muxes every uploaded caption straight into the HLS manifest as a
+    // subtitle rendition, keyed by the same language tag it was uploaded under (spec section
+    // 8) — so "selecting" a caption is just matching that tag against whichever track-listing
+    // API the active playback path exposes, not fetching or rendering anything ourselves.
+    // Registered as a persistent listener (not .once) on both paths below, since a token
+    // refresh reloads the manifest and re-lists tracks, which would otherwise silently drop
+    // the viewer's choice mid-playback.
+    function applyCaptionSelection() {
+      if (hlsInstance && hlsInstance.subtitleTracks) {
+        var idx = -1;
+        for (var i = 0; i < hlsInstance.subtitleTracks.length; i++) {
+          var t = hlsInstance.subtitleTracks[i];
+          if (currentCaptionLang && (t.lang || "").toLowerCase() === currentCaptionLang.toLowerCase()) {
+            idx = i;
+            break;
+          }
+        }
+        hlsInstance.subtitleTrack = idx;
+      } else if (video.textTracks) {
+        for (var j = 0; j < video.textTracks.length; j++) {
+          var track = video.textTracks[j];
+          var matches = !!currentCaptionLang && (track.language || "").toLowerCase() === currentCaptionLang.toLowerCase();
+          track.mode = matches ? "showing" : "hidden";
+        }
+      }
     }
 
     var hlsInstance = null; // set once, reused across refreshes
@@ -192,6 +471,9 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     // fails with MEDIA_ERR_SRC_NOT_SUPPORTED. Hls.isSupported() (an MSE
     // capability check) is the reliable signal; native HLS is really only
     // needed for Safari/iOS, where Hls.isSupported() is false anyway.
+    // If captions fail to load some other way, this still isn't allowed to block playback —
+    // errors here fall through to showDenied only for genuine source failures, never silently
+    // hang on a caption problem.
     function attachSource(manifestUrl) {
       return import("https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js").then(function () {
         var Hls = window.Hls;
@@ -199,9 +481,11 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
           hlsInstance = new Hls();
           hlsInstance.loadSource(manifestUrl);
           hlsInstance.attachMedia(video);
+          hlsInstance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, applyCaptionSelection);
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           usingNativeHls = true;
           video.src = manifestUrl;
+          video.textTracks.addEventListener("addtrack", applyCaptionSelection);
         } else {
           showDenied("This browser cannot play this video.");
         }
@@ -259,55 +543,221 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
       }, delay);
     }
 
-    async function start() {
-      var minted = await fetchToken();
-      issuedAtMs = minted.issuedAtMs;
-      markAs = minted.markAs;
-      await attachSource(buildManifestUrl(minted.token));
-      scheduleRefresh(minted.expiresAtMs);
+    // Single entry point for actually starting playback — called from the gate (language
+    // cell or skip), the returning-viewer play button, or the plain play button. Mints the
+    // real Stream token and records the play event (spec section 6 step 4) here, and only
+    // here, never earlier — see the /api/languages split above.
+    function beginPlayback() {
+      if (started) return;
+      started = true;
+      bigPlayButton.style.display = "none";
+      fetchToken()
+        .then(function (minted) {
+          issuedAtMs = minted.issuedAtMs;
+          markAs = minted.markAs;
+          return attachSource(buildManifestUrl(minted.token)).then(function () {
+            applyCaptionSelection();
+            scheduleRefresh(minted.expiresAtMs);
+            return video.play();
+          });
+        })
+        .catch(function (err) {
+          // fetchToken() already renders #denied on a real entitlement failure (container's
+          // innerHTML is replaced, so the lines below become harmless no-ops on detached
+          // nodes). A rejected video.play() is different — autoplay policy, not a denial —
+          // so let the viewer just tap again.
+          console.error(err);
+          started = false;
+          bigPlayButton.style.display = "flex";
+        });
     }
 
-    playPauseBtn.addEventListener("click", function () {
-      if (video.paused) { video.play(); } else { video.pause(); }
+    // --- Language gate -------------------------------------------------------------------
+
+    var lastFocused = null;
+    var focusTrapHandler = null;
+
+    function trapFocus(el) {
+      focusTrapHandler = function (e) {
+        if (e.key !== "Tab") return;
+        var focusable = el.querySelectorAll("button");
+        if (!focusable.length) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      };
+      document.addEventListener("keydown", focusTrapHandler);
+    }
+    function releaseFocusTrap() {
+      if (focusTrapHandler) {
+        document.removeEventListener("keydown", focusTrapHandler);
+        focusTrapHandler = null;
+      }
+    }
+
+    function chooseLanguage(tag) {
+      currentCaptionLang = tag;
+      writeStoredLang(tag);
+      hideGate();
+      beginPlayback();
+    }
+
+    function showGate(languages) {
+      var suggested = computeSuggestedTag(languages);
+      var ordered = languages.slice();
+      if (suggested) {
+        ordered.sort(function (a, b) {
+          if (a.languageTag === suggested) return -1;
+          if (b.languageTag === suggested) return 1;
+          return 0;
+        });
+      }
+      gateGrid.innerHTML = "";
+      ordered.forEach(function (l) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "gateCell" + (l.languageTag === suggested ? " suggested" : "");
+        var span = document.createElement("span");
+        span.lang = l.languageTag;
+        span.textContent = endonymFor(l.languageTag);
+        btn.appendChild(span);
+        btn.addEventListener("click", function () { chooseLanguage(l.languageTag); });
+        gateGrid.appendChild(btn);
+      });
+
+      hideChip();
+      bigPlayButton.style.display = "none";
+      gate.classList.remove("gateDismissing");
+      gate.style.display = "flex";
+      container.classList.add("gate-open");
+      lastFocused = document.activeElement;
+      trapFocus(gate);
+      var first = gateGrid.querySelector("button");
+      (first || gateSkip).focus();
+    }
+
+    function hideGate() {
+      // Shrink the container back to its normal 16:9 box immediately, not deferred to the
+      // end of the fade — gate is inset:0 to container, so it shrinks (and fades) together;
+      // waiting would instead let the plain <video> element flash at full-viewport size
+      // behind the still-fading scrim for 200ms before snapping down.
+      container.classList.remove("gate-open");
+      var prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var finish = function () {
+        gate.style.display = "none";
+        gate.classList.remove("gateDismissing");
+        releaseFocusTrap();
+        // Spec: "focus moved to the player on dismiss" — the container is always a valid,
+        // stable landing spot regardless of what state playback ends up in a moment later.
+        container.focus();
+      };
+      if (prefersReduced) {
+        finish();
+      } else {
+        gate.classList.add("gateDismissing");
+        setTimeout(finish, 200);
+      }
+    }
+
+    gateSkip.addEventListener("click", function () {
+      currentCaptionLang = null;
+      writeStoredLang("off");
+      hideGate();
+      beginPlayback();
     });
-    video.addEventListener("play", function () { playPauseBtn.textContent = "⏸"; });
-    video.addEventListener("pause", function () { playPauseBtn.textContent = "▶"; });
+
+    // --- Returning-viewer chip ------------------------------------------------------------
+
+    var chipTimer = null;
+
+    function showChip(tag) {
+      gateChipText.textContent = "Captions: " + (tag ? endonymFor(tag) : "Off") + " ·";
+      gateChip.style.display = "flex";
+      clearTimeout(chipTimer);
+      chipTimer = setTimeout(hideChip, 4000);
+    }
+    function hideChip() {
+      clearTimeout(chipTimer);
+      gateChip.style.display = "none";
+    }
+    gateChangeBtn.addEventListener("click", function () {
+      hideChip();
+      showGate(availableLanguages);
+    });
+
+    // --- Initial resolution (spec: language resolution order) ----------------------------
+
+    function resolveInitialState(languages) {
+      var availableTags = languages.map(function (l) { return l.languageTag; });
+
+      // 1. ?lang= — present and valid skips the gate entirely (state 3).
+      if (LANG && availableTags.indexOf(LANG) !== -1) {
+        return { state: "chip", lang: LANG };
+      }
+      // An unknown/unavailable ?lang= falls through to normal resolution below, not an error.
+
+      // 2. Stored preference (including the persisted "off" choice).
+      var stored = readStoredLang();
+      if (stored === "off") {
+        return { state: "chip", lang: null };
+      }
+      if (stored && availableTags.indexOf(stored) !== -1) {
+        return { state: "chip", lang: stored };
+      }
+
+      // Nothing meaningful to gate on with 0 or 1 languages — still apply the locale/
+      // is_default heuristic quietly, but there's no real choice to surface, so no gate and
+      // no chip either (there's nothing a "change" link would meaningfully undo).
+      if (languages.length < 2) {
+        return { state: "plain", lang: pickInitialLanguage(languages) };
+      }
+
+      // 3. No skip condition met — show the gate. Locale match (if any) only affects
+      // ordering/styling inside showGate(), it does not bypass the gate on its own.
+      return { state: "gate", lang: null };
+    }
+
+    async function init() {
+      availableLanguages = await fetchLanguages();
+      var resolved = resolveInitialState(availableLanguages);
+      currentCaptionLang = resolved.lang;
+
+      if (resolved.state === "gate") {
+        showGate(availableLanguages);
+      } else if (resolved.state === "chip") {
+        showChip(currentCaptionLang);
+      }
+      // "plain": nothing extra to show — the default-visible big play button is enough.
+    }
+
+    // --- Playback controls ------------------------------------------------------------------
+    // No persistent control bar — the big play button handles the first tap and every
+    // resume after a pause; tapping the video itself (once playback has actually begun)
+    // toggles play/pause the same way. No fullscreen, no mid-playback CC menu: the language
+    // gate is the only caption-selection point now.
+
+    function togglePlayback() {
+      if (!started) { beginPlayback(); return; }
+      if (video.paused) { video.play(); } else { video.pause(); }
+    }
+    bigPlayButton.addEventListener("click", togglePlayback);
+    video.addEventListener("click", togglePlayback);
+    video.addEventListener("play", function () {
+      bigPlayButton.style.display = "none";
+      hideChip();
+    });
+    video.addEventListener("pause", function () {
+      bigPlayButton.style.display = "flex";
+    });
     video.addEventListener("timeupdate", updateWatermark);
 
-    function supportsRealFullscreen() {
-      return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
-    }
-
-    function enterRealFullscreen() {
-      if (container.requestFullscreen) return container.requestFullscreen();
-      if (container.webkitRequestFullscreen) return container.webkitRequestFullscreen();
-    }
-
-    function exitRealFullscreen() {
-      if (document.exitFullscreen) return document.exitFullscreen();
-      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
-    }
-
-    fullscreenBtn.addEventListener("click", function () {
-      // Fullscreen the CONTAINER, never the <video> element itself, so the
-      // watermark (a sibling DOM node) keeps rendering above the video
-      // once fullscreen (spec section 7 + amendment). Real Fullscreen API
-      // works on desktop and iPadOS 16.4+; iPhone Safari does not support
-      // requestFullscreen on non-video elements in shipping releases, so
-      // it falls back to a CSS-only "fake fullscreen" that never leaves
-      // the page DOM, which is why the watermark still shows there too.
-      if (supportsRealFullscreen()) {
-        enterRealFullscreen();
-      } else {
-        container.classList.add("fake-fullscreen");
-      }
-    });
-
-    exitFakeFullscreenBtn.addEventListener("click", function () {
-      container.classList.remove("fake-fullscreen");
-    });
-
-    start().catch(function (err) { console.error(err); });
+    init().catch(function (err) { console.error(err); });
   })();
   </script>
 </body>

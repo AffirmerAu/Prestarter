@@ -41,6 +41,14 @@ export async function pgPatch(env: Env, query: string, patch: Record<string, unk
   if (!res.ok) throw new Error(`patch ${query} failed: ${res.status} ${await res.text()}`);
 }
 
+export async function pgDelete(env: Env, query: string): Promise<void> {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${query}`, {
+    method: "DELETE",
+    headers: headers(env),
+  });
+  if (!res.ok) throw new Error(`delete ${query} failed: ${res.status} ${await res.text()}`);
+}
+
 // Upsert-by-conflict-target, used for the usage_daily counter (primary key client_id,
 // video_id, day). Uses PostgREST's on_conflict + merge-duplicates.
 export async function pgUpsert(

@@ -45,3 +45,21 @@ export function assetUrl(path: string): Promise<string> {
     return URL.createObjectURL(blob);
   });
 }
+
+// Content-Disposition on a blob: URL is ignored by the browser (blob URLs carry no HTTP
+// headers of their own), so a real file download — not just an opened tab — needs its own
+// <a download> element with the filename set explicitly, rather than assetUrl()'s window.open
+// pattern (which is for things meant to be viewed, like QR/poster images).
+export async function downloadAsset(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { headers: await authHeaders() });
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

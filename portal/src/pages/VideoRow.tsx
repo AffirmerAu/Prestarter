@@ -46,6 +46,7 @@ export function VideoRow({
   accessKey: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [format, setFormat] = useState<Format>("watch");
   const [lang, setLang] = useState("");
   const [copied, setCopied] = useState(false);
@@ -53,6 +54,11 @@ export function VideoRow({
   const linkRef = useRef<HTMLElement | null>(null);
 
   const link = accessKey ? buildLink(video.id, accessKey, format, lang) : "";
+  // Same watch-page URL already used for the copyable "Watch page" link below — playing it
+  // inline here doesn't hand the client anything they couldn't already get from that panel,
+  // it's just rendered instead of copied. Still a link to the player domain carrying the
+  // access key, never a raw Cloudflare Stream URL (CLAUDE.md security invariants).
+  const playUrl = accessKey ? buildLink(video.id, accessKey, "watch", "") : "";
 
   async function copyLink() {
     try {
@@ -90,6 +96,13 @@ export function VideoRow({
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setPlaying((p) => !p)}
+            disabled={!accessKey}
+            className="rounded bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+          >
+            {playing ? "Hide player" : "Play"}
+          </button>
+          <button
             onClick={() => accessKey && openAsset(`/portal/videos/${video.id}/qr.png`)}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
           >
@@ -103,6 +116,17 @@ export function VideoRow({
           </button>
         </div>
       </div>
+
+      {playing && playUrl && (
+        <div className="mt-4 aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">
+          <iframe
+            src={playUrl}
+            className="h-full w-full border-0"
+            allow="fullscreen"
+            title={video.title}
+          />
+        </div>
+      )}
 
       {expanded && (
         <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">

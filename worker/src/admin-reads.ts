@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { pgSelect } from "./supabase";
 import { handleQrExport, handlePosterExport } from "./admin-export";
+import { getUnsyncedStreamCaptions, handleDownloadCaptionVtt } from "./captions";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -20,6 +21,9 @@ export async function handleAdminReads(request: Request, url: URL, env: Env): Pr
 
   const videoDetail = url.pathname.match(/^\/internal\/videos\/([^/]+)$/);
   if (videoDetail?.[1]) return videoDetailHandler(env, videoDetail[1]);
+
+  const captionVtt = url.pathname.match(/^\/internal\/video-languages\/([^/]+)\/vtt$/);
+  if (captionVtt?.[1]) return handleDownloadCaptionVtt(env, captionVtt[1]);
 
   if (url.pathname === "/internal/alerts") return listAlerts(env);
   if (url.pathname === "/internal/dashboard") return dashboard(env);
@@ -91,16 +95,23 @@ async function listVideos(env: Env): Promise<Response> {
 }
 
 async function videoDetailHandler(env: Env, videoId: string): Promise<Response> {
-  const videos = await pgSelect<Record<string, unknown>>(env, `videos?id=eq.${videoId}&select=*`);
+  const videos = await pgSelect<{ id: string; stream_uid: string; [key: string]: unknown }>(
+    env,
+    `videos?id=eq.${videoId}&select=*`,
+  );
   const video = videos[0];
   if (!video) return json({ message: "Not found" }, 404);
 
-  const [languages, entitledClients] = await Promise.all([
+  const [languages, entitledClients, unsyncedStreamCaptions] = await Promise.all([
     pgSelect(env, `video_languages?video_id=eq.${videoId}&select=*`),
     pgSelect(env, `entitlements?video_id=eq.${videoId}&select=client_id,clients(id,name)`),
+    // Captions that exist on Cloudflare Stream (e.g. uploaded via Stream's own dashboard)
+    // but have no video_languages row yet — offered in the admin UI to register (still
+    // requiring an explicit mark-reviewed step before reaching a client, spec section 8).
+    getUnsyncedStreamCaptions(env, videoId, video.stream_uid).catch(() => []),
   ]);
 
-  return json({ video, languages, entitledClients });
+  return json({ video, languages, entitledClients, unsyncedStreamCaptions });
 }
 
 async function listAlerts(env: Env): Promise<Response> {

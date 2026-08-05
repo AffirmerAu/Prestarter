@@ -2,6 +2,7 @@ import type { Env } from "./env";
 import { renderPlayerPage } from "./player";
 import { mintPlaybackToken } from "./stream";
 import { checkEntitlement, recordPlay } from "./entitlement";
+import { getReviewedCaptionLanguages } from "./captions";
 import { handleInternalAdmin } from "./admin";
 import { handlePortal } from "./portal";
 import { runBillingTransitions } from "./billing-cron";
@@ -26,6 +27,10 @@ export default {
 
     if (url.pathname === "/api/token") {
       return handleTokenRequest(request, url, env, ctx);
+    }
+
+    if (url.pathname === "/api/languages") {
+      return handleLanguagesRequest(url, env);
     }
 
     const manifestMatch = url.pathname.match(/^\/m\/([^/]+)$/);
@@ -68,19 +73,59 @@ async function handleTokenRequest(request: Request, url: URL, env: Env, ctx: Exe
     // in the background so it never adds to the <200ms token-issue budget (spec section 15).
     ctx.waitUntil(recordPlay(env, request, result.clientId, videoId, { source, languageTag }));
 
-    const minted = await mintPlaybackToken(env, result.streamUid);
+    const [minted, languages] = await Promise.all([
+      mintPlaybackToken(env, result.streamUid),
+      getReviewedCaptionLanguages(env, videoId),
+    ]);
     return new Response(
       JSON.stringify({
         token: minted.token,
         issuedAtMs: minted.issuedAtMs,
         expiresAtMs: minted.expiresAtMs,
         markAs: result.markAs,
+        languages: languages.map((l) => ({
+          languageTag: l.language_tag,
+          labelNative: l.label_native,
+          isDefault: l.is_default,
+        })),
       }),
       { headers: { "content-type": "application/json" } },
     );
   } catch (err) {
     // On any validation or upstream failure, deny playback. Never fall back
     // to an unsigned URL (security invariants in CLAUDE.md / spec section 6).
+    console.error(err);
+    return deny();
+  }
+}
+
+// Read-only: lets the player's pre-play language gate show the right options without
+// minting a Stream token or recording a play event — reuses the same checkEntitlement()
+// authorization check as /api/token (so a bad/expired key still gets nothing back), but the
+// actual play event only fires from the real /api/token call once a viewer taps something.
+// Deliberately not "on any validation failure, deny playback" here — this endpoint doesn't
+// gate playback at all, /api/token still does that in full when the viewer actually plays.
+async function handleLanguagesRequest(url: URL, env: Env): Promise<Response> {
+  const videoId = url.searchParams.get("videoId");
+  const accessKey = url.searchParams.get("k");
+  if (!videoId || !accessKey) return deny();
+
+  try {
+    const result = await checkEntitlement(env, videoId, accessKey);
+    if (!result.ok) return deny();
+
+    const languages = await getReviewedCaptionLanguages(env, videoId);
+    return new Response(
+      JSON.stringify({
+        languages: languages.map((l) => ({
+          languageTag: l.language_tag,
+          labelNative: l.label_native,
+          isDefault: l.is_default,
+        })),
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  } catch (err) {
     console.error(err);
     return deny();
   }

@@ -2,7 +2,12 @@ import type { Env } from "./env";
 import { pgSelect, pgInsert, pgPatch } from "./supabase";
 import { requireAdmin } from "./admin-auth";
 import { handleAdminReads } from "./admin-reads";
-import { handleCaptionUpload, handleMarkCaptionReviewed } from "./captions";
+import {
+  handleCaptionUpload,
+  handleMarkCaptionReviewed,
+  handleRegisterStreamCaption,
+  handleDeleteCaption,
+} from "./captions";
 
 function daysBetween(fromISO: string, toISO: string): number {
   const from = new Date(fromISO + "T00:00:00Z").getTime();
@@ -43,6 +48,12 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
 
   const captionReview = url.pathname.match(/^\/internal\/video-languages\/([^/]+)\/mark-reviewed$/);
   if (captionReview?.[1]) return handleMarkCaptionReviewed(env, captionReview[1], auth.email);
+
+  const captionStreamSync = url.pathname.match(/^\/internal\/videos\/([^/]+)\/captions\/register-from-stream$/);
+  if (captionStreamSync?.[1]) return handleRegisterStreamCaption(env, captionStreamSync[1], await request.json());
+
+  const captionDelete = url.pathname.match(/^\/internal\/video-languages\/([^/]+)\/delete$/);
+  if (captionDelete?.[1]) return handleDeleteCaption(env, captionDelete[1], auth.email);
 
   return new Response("Not found", { status: 404 });
 }

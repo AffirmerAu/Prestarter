@@ -45,6 +45,7 @@ function statusBanner(client: ClientStatus): string {
 export function Portal() {
   const { session, signOut } = useAuth();
   const [client, setClient] = useState<ClientStatus | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [languages, setLanguages] = useState<VideoLanguage[]>([]);
   const [accessKey, setAccessKey] = useState<string | null>(null);
@@ -71,11 +72,32 @@ export function Portal() {
         .order("issued_at", { ascending: false })
         .limit(1);
       setAccessKey(keyRows?.[0]?.key ?? null);
+      setLoaded(true);
     }
     load();
   }, []);
 
-  if (!client) return <p className="p-8 text-sm text-gray-500">Loading…</p>;
+  if (!loaded) return <p className="p-8 text-sm text-gray-500">Loading…</p>;
+
+  // A signed-in user with no matching client_contacts row (wrong email, or one never
+  // provisioned for them) — client_safe_status legitimately returns zero rows via RLS.
+  // Show that plainly instead of hanging on "Loading…" forever with no way out.
+  if (!client) {
+    return (
+      <div className="mx-auto max-w-md p-8 text-center">
+        <p className="text-sm text-gray-700">
+          No client account is set up for <span className="font-medium">{session?.user.email}</span>.
+          Contact Affirmer to be added, or sign in with the correct email.
+        </p>
+        <button
+          onClick={signOut}
+          className="mt-4 rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
