@@ -1,0 +1,12 @@
+-- Fix: security_invoker on client_safe_status meant the view ran with the querying user's
+-- own privileges — but authenticated has no direct SELECT grant on `clients` (revoked
+-- deliberately in 0002, so daily_cap_advisory can never be reached directly). That made the
+-- view unreadable for everyone, including its own intended row.
+--
+-- The view's `where id = current_client_id()` clause already does the row-scoping via a
+-- security-definer function, independent of the querying user's table grants — so the view
+-- doesn't need security_invoker at all. Running as the view owner (the default) is what lets
+-- it bypass the revoked grant while the WHERE clause still correctly restricts it to the
+-- caller's own row (current_client_id() reads auth.uid() from the request's own JWT
+-- regardless of the view's execution privilege).
+alter view client_safe_status set (security_invoker = false);

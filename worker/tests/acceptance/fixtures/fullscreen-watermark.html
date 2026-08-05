@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AT24 fixture — fullscreen watermark survival (not Cloudflare Stream)</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #222; height: 100%; }
+  #container {
+    position: relative;
+    width: 100%;
+    max-width: 960px;
+    aspect-ratio: 16 / 9;
+    margin: 0 auto;
+    background: #000;
+    overflow: hidden;
+  }
+  #container.fake-fullscreen {
+    position: fixed;
+    inset: 0;
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    aspect-ratio: unset;
+    z-index: 2147483647;
+  }
+  video { width: 100%; height: 100%; display: block; background: #000; }
+  /* Same fixed values as worker/src/player.ts — spec section 7. */
+  #watermark {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    color: #fff;
+    opacity: 0.3;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.3;
+    text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+  }
+  #controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.6));
+  }
+  #controls button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px 8px; }
+  #exitFakeFullscreen {
+    display: none;
+    position: absolute; top: 12px; right: 12px; z-index: 1;
+    background: rgba(0,0,0,0.5); border: none; color: #fff; font-size: 16px;
+    padding: 6px 10px; border-radius: 4px;
+  }
+  #container.fake-fullscreen #exitFakeFullscreen { display: block; }
+  #readout { font-family: system-ui, sans-serif; color: #fff; padding: 8px 12px; }
+</style>
+</head>
+<body>
+  <div id="readout">fullscreen path: not yet triggered</div>
+  <div id="container">
+    <video id="video" playsinline autoplay muted loop
+      src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"></video>
+    <div id="watermark">Acme Pty Ltd (stage one test) · 00:00:00</div>
+    <button id="exitFakeFullscreen" aria-label="Exit fullscreen">&times;</button>
+    <div id="controls">
+      <button id="playPause" aria-label="Play">&#9658;</button>
+      <button id="fullscreen" aria-label="Fullscreen">&#9974;</button>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var container = document.getElementById("container");
+    var video = document.getElementById("video");
+    var fullscreenBtn = document.getElementById("fullscreen");
+    var exitFakeFullscreenBtn = document.getElementById("exitFakeFullscreen");
+    var playPauseBtn = document.getElementById("playPause");
+    var readout = document.getElementById("readout");
+
+    function supportsRealFullscreen() {
+      return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+    }
+    function enterRealFullscreen() {
+      if (container.requestFullscreen) return container.requestFullscreen();
+      if (container.webkitRequestFullscreen) return container.webkitRequestFullscreen();
+    }
+
+    playPauseBtn.addEventListener("click", function () {
+      if (video.paused) { video.play(); } else { video.pause(); }
+    });
+
+    // Same logic as worker/src/player.ts: fullscreen the CONTAINER, never
+    // the <video>, so the watermark (a sibling DOM node, becomes a
+    // descendant of the fullscreen element) keeps rendering above it.
+    fullscreenBtn.addEventListener("click", function () {
+      if (supportsRealFullscreen()) {
+        readout.textContent = "fullscreen path: real Fullscreen API requested on #container";
+        var p = enterRealFullscreen();
+        if (p && p.catch) {
+          p.catch(function (e) {
+            readout.textContent = "fullscreen path: requestFullscreen rejected — " + e;
+          });
+        }
+      } else {
+        readout.textContent = "fullscreen path: CSS fake-fullscreen fallback (no Fullscreen API on non-video elements)";
+        container.classList.add("fake-fullscreen");
+      }
+    });
+    exitFakeFullscreenBtn.addEventListener("click", function () {
+      container.classList.remove("fake-fullscreen");
+      readout.textContent = "fullscreen path: exited fake fullscreen";
+    });
+    document.addEventListener("fullscreenchange", function () {
+      readout.textContent = "fullscreen path: fullscreenElement = " +
+        (document.fullscreenElement ? document.fullscreenElement.id : "none");
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -249,4 +249,9 @@ rather than a product.
 | IP Australia trade mark search, classes 41, 9 and 42 | D6 | Before first poster printed |
 | Manual usage report route for clients needing audit evidence | D22 | Before first client asks |
 | Ninety-day success measure and stop condition | D27, D28 | Before build starts |
-| Grace period default, currently 14 days | spec 10 | Before billing logic built |
+
+## Resolved during build
+
+**Grace period.** Spec section 10 listed 14 days as a placeholder default. Set to **30 days**
+ahead of stage two's billing logic (decided directly with Matt, 2026-08-01). `clients.grace_days`
+defaults to 30 in the schema; still overridable per client via "Extend grace" (D14).

@@ -1,0 +1,35 @@
+name = "prestarter"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Spec section 19's "one host or two" — resolved: the root domain is exclusively the Worker
+# (playback + API), never a Pages project, since URL length only matters for what ends up on
+# a printed poster (D6) — admin and portal each get their own subdomain as separate Pages
+# projects instead (see ../admin/README.md, ../portal/README.md).
+routes = [
+  { pattern = "prestarter.au/*", zone_name = "prestarter.au" },
+]
+
+# Nightly billing-transition sweep (spec section 10). Test locally with:
+#   curl "http://127.0.0.1:8787/__scheduled?cron=0+16+*+*+*"
+[triggers]
+crons = ["0 16 * * *"] # 02:00 AEST / 03:00 AEDT
+
+# Bundles font files as raw binary (ArrayBuffer) — resvg-wasm has no system font access in
+# the Workers runtime, so poster/QR PNG text rendering needs an explicit font buffer.
+[[rules]]
+type = "Data"
+globs = ["**/*.ttf"]
+fallthrough = true
+
+[vars]
+# Non-secret config (anon key is meant to be public — RLS is what actually protects data).
+STREAM_CUSTOMER_CODE = "rsajoil306p14rsy"
+SUPABASE_URL = "https://agxuvlavdntxzgxvpvjw.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFneHV2bGF2ZG50eHpneHZwdmp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjI1ODgsImV4cCI6MjEwMTA5ODU4OH0.dTo3ctjWyMjwiFjEtR1Q5-OtfQeM17kCI0vdNJKBIvw"
+
+# Secrets (set with `wrangler secret put NAME`, never committed):
+#   CF_ACCOUNT_ID
+#   CF_STREAM_API_TOKEN
+#   SUPABASE_SERVICE_ROLE_KEY
+#   ADDRESS_HASH_PEPPER

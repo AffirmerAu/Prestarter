@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.*.local
+.dev.vars
+supabase/seed/test-orgs.json
+supabase/seed/admin-test.json
+admin/.env
+admin/.env.production
+portal/.env
+portal/.env.production

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "at24-fullscreen-fixture",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["worker/tests/acceptance/fixtures/serve.mjs"],
+      "port": 4173
+    }
+  ]
+}

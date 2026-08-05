@@ -133,7 +133,7 @@ exhaustion should also warn the client, specify the wording, since it cannot inc
 clients
   id, name, mark_as, status (active|paused),
   plan_tier, term_start, term_end,
-  billing_state (paid|due|overdue), paid_to, grace_days (default 14),
+  billing_state (paid|due|overdue), paid_to, grace_days (default 30),
   daily_cap_advisory, created_at
 
 client_contacts
@@ -522,6 +522,5 @@ The build is not done until all of these pass.
   Affirmer mark to establish provenance.
 - **Trade mark clearance.** PRESTART is filed as a software mark by Australian entities in adjacent
   categories. Search IP Australia in classes 41, 9 and 42 before printing any poster.
-- Grace period default — currently 14 days.
 - Whether clients may request a usage report manually, given the portal shows none. Safety managers
   commonly need evidence for audits, and a refusal with no alternative will generate friction.
