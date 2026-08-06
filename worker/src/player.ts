@@ -28,6 +28,9 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     height: 100%;
     overflow: hidden; /* the page itself should never scroll — see #container sizing below */
   }
+  @supports (height: 100dvh) {
+    html, body { height: 100dvh; }
+  }
   body {
     display: flex;
     align-items: center;
@@ -45,6 +48,18 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     background: #000;
     overflow: hidden;
   }
+  /* iOS Safari's vh is the "large" viewport — as if the address bar were already hidden —
+     which is taller than what's actually visible whenever the bar IS showing (confirmed on a
+     real iPhone in landscape: the plain-vh height computed here was taller than the visible
+     area, so Safari's own chrome clipped the top and bottom of the container). dvh tracks the
+     actually-visible viewport as that chrome shows/hides; vh above stays as the fallback for
+     browsers that don't support dvh at all. */
+  @supports (height: 100dvh) {
+    #container {
+      width: min(100dvw, calc(100dvh * 16 / 9));
+      height: min(100dvh, calc(100dvw * 9 / 16));
+    }
+  }
   #container:focus { outline: none; }
   /* While the gate is open there's no video playing yet to preserve an aspect ratio for —
      on a tall/narrow portrait phone the strict 16:9 box becomes a ~200px strip, nowhere near
@@ -58,7 +73,7 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     aspect-ratio: unset;
   }
   @supports (height: 100dvh) {
-    #container.gate-open { height: 100dvh; }
+    #container.gate-open { width: 100dvw; height: 100dvh; }
   }
   video {
     width: 100%;
