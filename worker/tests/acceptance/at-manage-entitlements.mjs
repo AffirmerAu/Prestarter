@@ -88,6 +88,9 @@ const client = (
 ).body?.[0];
 check("setup: throwaway client created", !!client, JSON.stringify(client));
 
+const accessKey = `at-manage-entitlements-${Date.now()}`;
+await rest("access_keys", { method: "POST", body: JSON.stringify({ client_id: client.id, key: accessKey }) });
+
 try {
   // --- Add a video ---
   const addRes = await fetch(`${WORKER_URL}/internal/clients/${client.id}/entitlements`, {
@@ -106,6 +109,10 @@ try {
     headers: { Authorization: `Bearer ${adminToken}` },
   }).then((r) => r.json());
   check("video shows up in client detail's entitlements", clientDetail.entitlements.some((e) => e.video_id === video.id), JSON.stringify(clientDetail.entitlements));
+
+  // --- The real enforcement path (not just the DB row) confirms access before revoke ---
+  const beforeToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
+  check("playback succeeds before revoke (real /api/token check, not just the DB row)", beforeToken.status === 200, `status ${beforeToken.status}`);
 
   // --- Missing video_id rejected ---
   const badRes = await fetch(`${WORKER_URL}/internal/clients/${client.id}/entitlements`, {
@@ -132,9 +139,19 @@ try {
   check("revoke succeeds", revokeRes.status === 200, JSON.stringify(revokeBody));
 
   const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const revokedRow = (await rest(`entitlements?id=eq.${addBody.id}&select=*`)).body?.[0];
   check("row still exists (soft-revoke, not deleted)", !!revokedRow, JSON.stringify(revokedRow));
-  check("effective_to is set to today", revokedRow?.effective_to === today, JSON.stringify(revokedRow));
+  // Must be YESTERDAY, not today — checkEntitlement() treats effective_to as inclusive
+  // (effective_to >= today still grants access), the same convention term_end/paid_to use.
+  // Setting it to today would leave the entitlement usable for the rest of the day this was
+  // clicked — this is the actual bug a real run of this test caught.
+  check("effective_to is set to yesterday, not today (see comment)", revokedRow?.effective_to === yesterday, JSON.stringify(revokedRow));
+
+  // --- The real enforcement path confirms access is ACTUALLY cut off immediately, not just
+  // that the DB row changed to some value ---
+  const afterToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
+  check("playback is refused immediately after revoke (real /api/token check)", afterToken.status === 403, `status ${afterToken.status}`);
 
   const auditRows = (
     await rest(
@@ -157,6 +174,9 @@ try {
 
   const reactivatedRow = (await rest(`entitlements?id=eq.${addBody.id}&select=*`)).body?.[0];
   check("reactivated row is open-ended again", reactivatedRow?.effective_to === null, JSON.stringify(reactivatedRow));
+
+  const reactivatedToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
+  check("playback works again after re-adding (real /api/token check)", reactivatedToken.status === 200, `status ${reactivatedToken.status}`);
 } finally {
   await rest(`clients?id=eq.${client.id}`, { method: "DELETE" }); // cascades entitlements
 }

@@ -208,7 +208,7 @@ export function ClientDetail() {
                     {e.videos.title}
                     {!active && (
                       <span className="ml-2 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-xs font-semibold text-[#475467]">
-                        removed {e.effective_to}
+                        removed
                       </span>
                     )}
                   </div>

@@ -221,11 +221,17 @@ async function addEntitlement(env: Env, clientId: string, actor: string, body: A
   return new Response(JSON.stringify({ id: entitlementId }), { headers: { "content-type": "application/json" } });
 }
 
-// Removing a video from a client sets effective_to = today rather than deleting the row —
-// entitlement.ts's checkEntitlement() cuts off access immediately either way (it checks
-// effective_to >= today), but this preserves the record of what the client WAS entitled to
-// and for how long, which the effective_from/effective_to columns exist for in the first
-// place. Re-adding the same video later reactivates this same row (see addEntitlement).
+// Removing a video from a client sets effective_to rather than deleting the row — preserves
+// the record of what the client WAS entitled to and for how long, which the
+// effective_from/effective_to columns exist for in the first place. Re-adding the same video
+// later reactivates this same row (see addEntitlement).
+//
+// effective_to = YESTERDAY, not today: entitlement.ts's checkEntitlement() treats
+// effective_to as inclusive (`e.effective_to >= today` still grants access), the same
+// convention term_end/paid_to use elsewhere in this system. Setting it to today would leave
+// access — and the admin UI's own "is this active" check — unchanged until the following
+// day, which isn't what "remove" means. (Caught this the hard way: the admin console showed
+// no visible change after clicking Remove, because there genuinely wasn't one yet.)
 async function revokeEntitlement(env: Env, entitlementId: string, actor: string): Promise<Response> {
   const rows = await pgSelect<{ id: string; client_id: string; video_id: string }>(
     env,
@@ -239,17 +245,17 @@ async function revokeEntitlement(env: Env, entitlementId: string, actor: string)
     });
   }
 
-  const today = todayISO();
-  await pgPatch(env, `entitlements?id=eq.${entitlementId}`, { effective_to: today });
+  const effectiveTo = addDaysISO(todayISO(), -1);
+  await pgPatch(env, `entitlements?id=eq.${entitlementId}`, { effective_to: effectiveTo });
   await pgInsert(env, "audit_log", {
     actor,
     action: "revoke_entitlement",
     subject_type: "clients",
     subject_id: entitlement.client_id,
-    detail: { video_id: entitlement.video_id, effective_to: today },
+    detail: { video_id: entitlement.video_id, effective_to: effectiveTo },
   });
 
-  return new Response(JSON.stringify({ effective_to: today }), { headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify({ effective_to: effectiveTo }), { headers: { "content-type": "application/json" } });
 }
 
 async function acknowledgeAlert(env: Env, alertId: string, actor: string): Promise<Response> {
