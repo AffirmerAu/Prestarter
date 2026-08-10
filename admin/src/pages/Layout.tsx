@@ -3,7 +3,7 @@ import { useAuth } from "../lib/auth";
 
 function navClass({ isActive }: { isActive: boolean }) {
   return `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-    isActive ? "bg-primary-tint text-primary-press" : "text-white/70 hover:bg-white/10 hover:text-white"
+    isActive ? "bg-primary-tint text-primary-press" : "text-muted hover:bg-surface-sunken hover:text-ink"
   }`;
 }
 
@@ -12,11 +12,11 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-surface-sunken">
-      <header className="bg-surface-inverse">
+      <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <img src="/brand/logo-horizontal-reverse.png" alt="Prestarter" className="h-[26px] w-auto" />
+              <img src="/brand/logo-horizontal.png" alt="Prestarter" className="h-[52px] w-auto" />
               <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Admin</span>
             </div>
             <nav className="flex gap-1">
@@ -31,9 +31,9 @@ export function Layout() {
               </NavLink>
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm text-white/60">
+          <div className="flex items-center gap-3 text-sm text-muted">
             <span>{session?.user.email}</span>
-            <button onClick={signOut} className="text-white/50 hover:text-white">
+            <button onClick={signOut} className="text-subtle hover:text-body">
               Sign out
             </button>
           </div>

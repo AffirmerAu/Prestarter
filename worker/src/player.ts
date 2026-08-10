@@ -140,15 +140,12 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     background: rgba(255,255,255,.94);
     border: none;
     color: var(--ps-green);
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
     transition: transform .15s ease-out;
-    /* Glyph's own whitespace makes it look left-of-centre otherwise. */
-    padding-left: 4px;
   }
   #bigPlayButton:hover { transform: translate(-50%, -50%) scale(1.05); }
   #bigPlayButton:focus-visible {
@@ -280,8 +277,6 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    padding-left: 3px;
   }
 
   /* Returning-viewer chip — brief, dismissible, non-modal (spec state 3). */
@@ -328,7 +323,9 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
   <div id="container" tabindex="-1">
     <video id="video" playsinline></video>
     <div id="watermark"></div>
-    <button id="bigPlayButton" aria-label="Play">&#9658;</button>
+    <button id="bigPlayButton" aria-label="Play">
+      <svg width="18" height="20" viewBox="0 0 18 20" fill="currentColor" aria-hidden="true"><path d="M1 1L17 10L1 19V1Z" stroke-linejoin="round"/></svg>
+    </button>
     <div id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
       <div id="gateHeader">
         <div id="gateIcon" aria-hidden="true">&#127760;</div>
@@ -338,7 +335,9 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
       <div id="gateGrid" role="group" aria-label="Available languages"></div>
       <div id="gateFooter">
         <button id="gateSkip" type="button">
-          <span class="gateSkipCircle" aria-hidden="true">&#9658;</span>
+          <span class="gateSkipCircle" aria-hidden="true">
+            <svg width="14" height="16" viewBox="0 0 14 16" fill="currentColor"><path d="M1 1L13 8L1 15V1Z" stroke-linejoin="round"/></svg>
+          </span>
           <span>Skip &mdash; play without captions</span>
         </button>
       </div>
