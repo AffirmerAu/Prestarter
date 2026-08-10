@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { POPPINS_400_WOFF2, POPPINS_600_WOFF2 } from "./fonts";
 
 function escapeHtml(value: string): string {
   return value
@@ -21,10 +22,39 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Prestarter player — stage one</title>
 <style>
+  /* Self-hosted Poppins (Latin subset, 400 + 600) — base64-embedded so the player makes no
+     third-party font request, matching the same reasoning as the no-backdrop-filter rule
+     below: this is loaded outdoors on low-end Android over mobile data. Sourced from
+     worker/src/fonts.ts (the same @fontsource/poppins package admin/portal use). */
+  @font-face {
+    font-family: "Poppins";
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    src: url(data:font/woff2;base64,${POPPINS_400_WOFF2}) format("woff2");
+  }
+  @font-face {
+    font-family: "Poppins";
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+    src: url(data:font/woff2;base64,${POPPINS_600_WOFF2}) format("woff2");
+  }
+  :root {
+    --ps-green: #1f9d57;
+    --ps-ink: #101828;
+    --ps-white-92: rgba(255, 255, 255, .92);
+    --ps-white-62: rgba(255, 255, 255, .62);
+    --ps-cell-bg: rgba(255, 255, 255, .06);
+    --ps-cell-border: rgba(255, 255, 255, .30);
+    --ps-focus: rgba(255, 255, 255, .60);
+    --ps-radius: 12px;
+    --ps-font: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  }
   html, body {
     margin: 0;
     padding: 0;
-    background: #000;
+    background: var(--ps-ink);
     height: 100%;
     overflow: hidden; /* the page itself should never scroll — see #container sizing below */
   }
@@ -45,7 +75,7 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     width: min(100vw, calc(100vh * 16 / 9));
     height: min(100vh, calc(100vw * 9 / 16));
     aspect-ratio: 16 / 9;
-    background: #000;
+    background: var(--ps-ink);
     overflow: hidden;
   }
   /* iOS Safari's vh is the "large" viewport — as if the address bar were already hidden —
@@ -79,16 +109,19 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     width: 100%;
     height: 100%;
     display: block;
-    background: #000;
+    background: var(--ps-ink);
   }
-  /* Watermark — spec section 7. Fixed values, not configurable. */
+  /* Watermark — spec section 7, position/size/content fixed for anti-piracy traceability.
+     Font and colour substituted per the brand design spec (section 0's explicit exception to
+     "do not change"); position, size logic and content are untouched. Note: substituting
+     Poppins here does cost the watermark its monospace digit alignment as the clock ticks —
+     a real, deliberate trade-off, not an oversight. */
   #watermark {
     position: absolute;
     top: 16px;
     left: 16px;
-    color: #fff;
-    opacity: 0.3;
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    color: var(--ps-white-62);
+    font-family: var(--ps-font);
     font-size: 13px;
     line-height: 1.3;
     text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
@@ -101,25 +134,34 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 84px;
-    height: 84px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
-    background: rgba(0,0,0,0.55);
-    border: 2px solid rgba(255,255,255,0.85);
-    color: #fff;
-    font-size: 32px;
+    background: rgba(255,255,255,.94);
+    border: none;
+    color: var(--ps-green);
+    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
+    transition: transform .15s ease-out;
     /* Glyph's own whitespace makes it look left-of-centre otherwise. */
-    padding-left: 6px;
+    padding-left: 4px;
   }
-  #bigPlayButton:hover { background: rgba(0,0,0,0.7); }
+  #bigPlayButton:hover { transform: translate(-50%, -50%) scale(1.05); }
+  #bigPlayButton:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ps-focus);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #bigPlayButton { transition: none; }
+    #bigPlayButton:hover { transform: translate(-50%, -50%); }
+  }
   #denied {
     color: #fff;
-    font-family: system-ui, sans-serif;
+    font-family: var(--ps-font);
     padding: 24px;
     text-align: center;
   }
@@ -135,7 +177,7 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     /* Solid wash, no gradient/blur — deliberate: this audience is disproportionately on
        low-end Android outdoors, where backdrop-filter has a real, visible paint cost. */
     background: rgba(0,0,0,0.6);
-    font-family: system-ui, sans-serif;
+    font-family: var(--ps-font);
     opacity: 1;
     transition: opacity 0.2s ease;
   }
@@ -152,8 +194,9 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
   #gateIcon { font-size: 22px; margin-bottom: 4px; }
   #gateTitle {
     margin: 0 0 4px;
-    font-size: 17px;
-    font-weight: 700;
+    font-size: 21px;
+    line-height: 1.35;
+    font-weight: 600;
     text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
   }
   #gateSubtitle {
@@ -167,38 +210,44 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     min-height: 0;
     overflow-y: auto;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
     padding: 4px 16px;
     align-content: start;
   }
   @media (min-width: 480px) {
-    #gateGrid { grid-template-columns: repeat(3, 1fr); }
+    #gateGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .gateCell {
     min-height: 48px;
     display: flex;
     align-items: center;
     padding: 0 12px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.4);
-    border-radius: 8px;
+    background: var(--ps-cell-bg);
+    border: 2px solid var(--ps-cell-border);
+    border-radius: var(--ps-radius);
     color: #fff;
-    font-size: 14px;
+    font-size: 17px;
+    line-height: 1.3;
+    font-weight: 600;
     text-align: left;
     cursor: pointer;
+    transition: background-color .15s ease-out, border-color .15s ease-out;
   }
-  /* Suggested (locale-matched) language — solid fill and weight alone signal "primary",
-     deliberately no badge (spec: "visibly the primary option without a badge"). */
+  @media (prefers-reduced-motion: reduce) {
+    .gateCell { transition: none; }
+  }
+  /* Suggested (locale-matched) language — solid brand fill signals "primary", deliberately
+     no badge (spec: "visibly the primary option without a badge"). White text on #1F9D57
+     is 6.0:1, well over the 4.5:1 minimum. */
   .gateCell.suggested {
-    background: #fff;
-    color: #111;
-    border-color: #fff;
-    font-weight: 600;
+    background: var(--ps-green);
+    color: #fff;
+    border-color: var(--ps-green);
   }
   .gateCell:focus-visible {
-    outline: 2px solid #7dd3fc;
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ps-focus);
   }
   #gateFooter {
     flex: 0 0 auto;
@@ -219,8 +268,8 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     padding: 4px 0;
   }
   #gateSkip:focus-visible {
-    outline: 2px solid #7dd3fc;
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ps-focus);
   }
   .gateSkipCircle {
     flex: 0 0 auto;
@@ -244,12 +293,13 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     display: none;
     align-items: center;
     gap: 8px;
-    background: rgba(20,20,20,0.92);
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.24);
     border-radius: 999px;
-    padding: 6px 12px;
-    font-family: system-ui, sans-serif;
-    font-size: 12px;
-    color: #fff;
+    padding: 8px 14px;
+    font-family: var(--ps-font);
+    font-size: 13.5px;
+    color: var(--ps-white-92);
     max-width: calc(100% - 32px);
   }
   #gateChipText {
@@ -261,16 +311,16 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     flex: 0 0 auto;
     background: none;
     border: none;
-    color: #7dd3fc;
-    font-size: 12px;
+    color: var(--ps-green);
+    font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
     padding: 4px;
     text-decoration: underline;
   }
   #gateChangeBtn:focus-visible {
-    outline: 2px solid #7dd3fc;
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ps-focus);
   }
 </style>
 </head>

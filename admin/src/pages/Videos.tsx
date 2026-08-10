@@ -24,23 +24,23 @@ export function Videos() {
     apiGet<VideoRow[]>("/internal/videos").then(setVideos);
   }, []);
 
-  if (!videos) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (!videos) return <p className="text-sm text-muted">Loading…</p>;
 
   return (
     <div>
-      <h1 className="mb-4 text-lg font-semibold text-gray-900">Video library</h1>
+      <h1 className="mb-4 text-h1 font-bold text-ink">Video library</h1>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {videos.map((v) => (
           <Link
             key={v.id}
             to={`/videos/${v.id}`}
-            className="rounded-lg border border-gray-200 bg-white p-4 hover:border-gray-400"
+            className="rounded-card border border-line bg-surface p-4 transition-colors hover:border-line-strong"
           >
-            <div className="mb-2 flex aspect-video items-center justify-center rounded bg-gray-100 text-xs text-gray-400">
+            <div className="mb-2 flex aspect-video items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
               {v.display_code}
             </div>
-            <div className="text-sm font-medium text-gray-900">{v.title}</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-sm font-medium text-ink">{v.title}</div>
+            <div className="text-xs text-muted">
               {v.category} · {formatDuration(v.duration_seconds)} · {v.status}
             </div>
           </Link>

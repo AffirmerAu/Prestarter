@@ -30,9 +30,9 @@ const ALERT_COPY: Record<string, (evidence: Record<string, unknown>) => string> 
 
 function Metric({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <div className="text-2xl font-semibold text-gray-900">{value}</div>
-      <div className="text-sm text-gray-500">{label}</div>
+    <div className="rounded-card border border-line bg-surface p-5">
+      <div className="text-h2 font-bold text-ink">{value}</div>
+      <div className="text-small text-muted">{label}</div>
     </div>
   );
 }
@@ -59,7 +59,7 @@ export function Dashboard() {
     load();
   }
 
-  if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (!data) return <p className="text-sm text-muted">Loading…</p>;
 
   const maxPlays = Math.max(1, ...data.playsByDay.map((d) => d.plays));
 
@@ -74,49 +74,51 @@ export function Dashboard() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Plays, last 7 days</h2>
-        <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-white p-4" style={{ height: 140 }}>
+        <h2 className="mb-3 text-label uppercase text-muted">Plays, last 7 days</h2>
+        <div className="flex items-end gap-2 rounded-card border border-line bg-surface p-4" style={{ height: 140 }}>
           {data.playsByDay.map((d) => (
             <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
               <div
-                className="w-full rounded-t bg-gray-900"
+                className="w-full rounded-t bg-primary"
                 style={{ height: `${(d.plays / maxPlays) * 90}px` }}
                 title={`${d.plays} plays`}
               />
-              <span className="text-[10px] text-gray-400">{d.day.slice(5)}</span>
+              <span className="text-[10px] text-subtle">{d.day.slice(5)}</span>
             </div>
           ))}
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Alerts</h2>
+        <h2 className="mb-3 text-label uppercase text-muted">Alerts</h2>
         {alerts.length === 0 ? (
-          <p className="text-sm text-gray-500">No open alerts.</p>
+          <p className="text-small text-muted">No open alerts.</p>
         ) : (
           <ul className="space-y-2">
             {alerts.map((a) => (
               <li
                 key={a.id}
-                className={`flex items-start justify-between rounded-lg border p-3 ${
-                  a.severity === "critical" ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"
+                className={`flex items-start justify-between rounded-card border p-3 ${
+                  a.severity === "critical"
+                    ? "border-[#FECDCA] bg-[#FEF3F2]"
+                    : "border-[#FEDF89] bg-[#FFFAEB]"
                 }`}
               >
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-ink">
                     {a.clients?.name ?? "Unknown client"} — {a.type.replace(/_/g, " ")}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-body">
                     {(ALERT_COPY[a.type]?.(a.evidence) ?? JSON.stringify(a.evidence))}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {a.clients && (
-                    <Link to={`/clients/${a.clients.id}`} className="text-sm text-gray-500 hover:underline">
+                    <Link to={`/clients/${a.clients.id}`} className="text-sm text-muted hover:underline">
                       Open client
                     </Link>
                   )}
-                  <button onClick={() => acknowledge(a.id)} className="text-sm text-gray-500 hover:underline">
+                  <button onClick={() => acknowledge(a.id)} className="text-sm text-muted hover:underline">
                     Dismiss
                   </button>
                 </div>
@@ -127,17 +129,17 @@ export function Dashboard() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Overdue accounts</h2>
+        <h2 className="mb-3 text-label uppercase text-muted">Overdue accounts</h2>
         {data.accountsOverdue.length === 0 ? (
-          <p className="text-sm text-gray-500">None.</p>
+          <p className="text-small text-muted">None.</p>
         ) : (
-          <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+          <ul className="divide-y divide-[#F2F4F7] rounded-card border border-line bg-surface">
             {data.accountsOverdue.map((c) => (
-              <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                <Link to={`/clients/${c.id}`} className="text-gray-900 hover:underline">
+              <li key={c.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <Link to={`/clients/${c.id}`} className="text-ink hover:underline">
                   {c.name}
                 </Link>
-                <span className="text-gray-500">paid to {c.paid_to}</span>
+                <span className="text-muted">paid to {c.paid_to}</span>
               </li>
             ))}
           </ul>

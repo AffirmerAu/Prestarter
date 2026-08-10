@@ -16,13 +16,14 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-lg font-semibold text-gray-900">Prestarter admin</h1>
-        <p className="mb-6 text-sm text-gray-500">Sign in with your Affirmer email.</p>
+    <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
+      <div className="w-full max-w-sm rounded-card border border-line bg-surface p-8 shadow-sm">
+        <img src="/brand/mark.png" alt="" className="mb-4 h-10 w-10" />
+        <h1 className="mb-1 text-h3 font-semibold text-ink">Prestarter admin</h1>
+        <p className="mb-6 text-sm text-muted">Sign in with your Affirmer email.</p>
         {sent ? (
-          <p className="text-sm text-gray-700">
-            Check <span className="font-medium">{email}</span> for a sign-in link.
+          <p className="text-sm text-body">
+            Check <span className="font-medium text-ink">{email}</span> for a sign-in link.
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -32,15 +33,15 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@affirmer.com.au"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="h-10 w-full rounded-input border border-line-strong px-3 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/24"
             />
             <button
               type="submit"
-              className="w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700"
+              className="h-10 w-full rounded-input bg-primary text-sm font-semibold text-white shadow-xs hover:bg-primary-hover active:bg-primary-press"
             >
               Send magic link
             </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-[#B42318]">{error}</p>}
           </form>
         )}
       </div>

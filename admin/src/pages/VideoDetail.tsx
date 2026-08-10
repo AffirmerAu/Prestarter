@@ -29,6 +29,11 @@ async function fetchPreviewKey(clientId: string): Promise<string | null> {
   return detail.keys.find((k) => !k.revoked_at)?.key ?? null;
 }
 
+const cardClass = "rounded-card border border-line bg-surface p-5";
+const cardHeaderClass = "mb-3 border-b border-line pb-3 text-h3 font-semibold text-ink";
+const inputClass =
+  "rounded-input border border-line-strong px-2.5 py-1.5 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/24";
+
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<VideoDetailData | null>(null);
@@ -105,74 +110,80 @@ export function VideoDetail() {
     }
   }
 
-  if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (!data) return <p className="text-sm text-muted">Loading…</p>;
   const captions = data.languages.filter((l) => l.kind === "caption");
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">{data.video.title}</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-h1 font-bold text-ink">{data.video.title}</h1>
+        <p className="text-sm text-muted">
           {data.video.display_code} · {data.video.status}
         </p>
       </div>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Review player</h2>
+      <section className={cardClass}>
+        <h2 className={cardHeaderClass}>Review player</h2>
         {previewUrl ? (
           <iframe
             src={previewUrl}
-            className="aspect-video w-full max-w-xl rounded border border-gray-200"
+            className="aspect-video w-full max-w-xl rounded-[12px] border border-line"
             title="Review player"
           />
         ) : (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             No client is entitled to this video yet, so there's no access key to preview playback with — the
             watermark uses the entitled client's real key, matching exactly what that client sees.
           </p>
         )}
       </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Captions</h2>
-        <ul className="mb-4 divide-y divide-gray-100 text-sm">
+      <section className={cardClass}>
+        <h2 className={cardHeaderClass}>Captions</h2>
+        <ul className="mb-4 divide-y divide-[#F2F4F7] text-sm">
           {captions.map((c) => (
             <li key={c.id} className="flex items-center justify-between py-2">
               <div>
-                <span className="font-medium text-gray-900">{c.label_native}</span>{" "}
-                <span className="text-gray-500">({c.language_tag})</span>
-                {c.is_default && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs">default</span>}
+                <span className="font-medium text-ink">{c.label_native}</span>{" "}
+                <span className="text-muted">({c.language_tag})</span>
+                {c.is_default && (
+                  <span className="ml-2 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-xs font-semibold text-[#475467]">
+                    default
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 {c.reviewed_at ? (
-                  <span className="text-xs text-green-700">Reviewed {new Date(c.reviewed_at).toLocaleDateString("en-AU")}</span>
+                  <span className="text-xs font-medium text-primary-press">
+                    Reviewed {new Date(c.reviewed_at).toLocaleDateString("en-AU")}
+                  </span>
                 ) : (
-                  <button onClick={() => markReviewed(c.id)} className="text-xs font-medium text-amber-700 hover:underline">
+                  <button onClick={() => markReviewed(c.id)} className="text-xs font-medium text-[#93370D] hover:underline">
                     Unreviewed — mark reviewed
                   </button>
                 )}
                 <button
                   onClick={() => downloadAsset(`/internal/video-languages/${c.id}/vtt`, `${c.language_tag}.vtt`)}
-                  className="text-xs font-medium text-gray-500 hover:underline"
+                  className="text-xs font-medium text-muted hover:underline"
                 >
                   Download .vtt
                 </button>
                 <button
                   onClick={() => removeCaption(c.id, c.label_native)}
                   disabled={removing === c.id}
-                  className="text-xs font-medium text-red-700 hover:underline disabled:opacity-50"
+                  className="text-xs font-medium text-[#B42318] hover:underline disabled:opacity-50"
                 >
                   {removing === c.id ? "Removing…" : "Remove"}
                 </button>
               </div>
             </li>
           ))}
-          {captions.length === 0 && <li className="py-2 text-gray-500">No captions yet.</li>}
+          {captions.length === 0 && <li className="py-2 text-muted">No captions yet.</li>}
         </ul>
 
         {data.unsyncedStreamCaptions.length > 0 && (
-          <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3">
-            <p className="mb-2 text-xs font-medium text-amber-900">
+          <div className="mb-4 rounded-[12px] border border-[#FEDF89] bg-[#FFFAEB] p-3">
+            <p className="mb-2 text-xs font-medium text-[#93370D]">
               Found on Cloudflare Stream but not registered here — uploaded outside this console (e.g. via the
               Stream dashboard directly), so nothing has reviewed them yet. Give each a native-script label to
               register it; it lands unreviewed like any other caption.
@@ -180,18 +191,18 @@ export function VideoDetail() {
             <ul className="space-y-2">
               {data.unsyncedStreamCaptions.map((c) => (
                 <li key={c.language_tag} className="flex items-center gap-2">
-                  <span className="w-14 text-sm font-medium text-gray-900">{c.language_tag}</span>
+                  <span className="w-14 text-sm font-medium text-ink">{c.language_tag}</span>
                   <input
                     type="text"
                     placeholder="Native label, e.g. Español"
                     value={syncLabels[c.language_tag] ?? ""}
                     onChange={(e) => setSyncLabels((s) => ({ ...s, [c.language_tag]: e.target.value }))}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+                    className={`flex-1 ${inputClass}`}
                   />
                   <button
                     onClick={() => registerFromStream(c.language_tag)}
                     disabled={!syncLabels[c.language_tag]?.trim() || registering === c.language_tag}
-                    className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    className="rounded-input border border-line-strong bg-surface px-3 py-1.5 text-sm text-body hover:bg-surface-sunken disabled:opacity-50"
                   >
                     {registering === c.language_tag ? "Registering…" : "Register"}
                   </button>
@@ -201,28 +212,28 @@ export function VideoDetail() {
           </div>
         )}
 
-        <form onSubmit={uploadCaption} className="flex flex-wrap items-end gap-3 border-t border-gray-100 pt-4">
+        <form onSubmit={uploadCaption} className="flex flex-wrap items-end gap-3 border-t border-line pt-4">
           <div>
-            <label className="block text-xs text-gray-500">Language tag (BCP-47)</label>
-            <input ref={langInput} type="text" placeholder="es" required className="w-24 rounded border border-gray-300 px-2 py-1 text-sm" />
+            <label className="block text-label uppercase text-muted">Language tag (BCP-47)</label>
+            <input ref={langInput} type="text" placeholder="es" required className={`mt-1 w-24 ${inputClass}`} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500">Native label</label>
-            <input ref={labelInput} type="text" placeholder="Español" required className="w-32 rounded border border-gray-300 px-2 py-1 text-sm" />
+            <label className="block text-label uppercase text-muted">Native label</label>
+            <input ref={labelInput} type="text" placeholder="Español" required className={`mt-1 w-32 ${inputClass}`} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500">WebVTT file</label>
-            <input ref={fileInput} type="file" accept=".vtt" required className="text-sm" />
+            <label className="block text-label uppercase text-muted">WebVTT file</label>
+            <input ref={fileInput} type="file" accept=".vtt" required className="mt-1 text-sm text-body" />
           </div>
           <button
             type="submit"
             disabled={uploading}
-            className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            className="rounded-input bg-primary px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover active:bg-primary-press disabled:opacity-50"
           >
             Upload
           </button>
         </form>
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-muted">
           Uploaded captions land unreviewed — a mistranslated safety instruction is a liability, not a typo.
         </p>
       </section>

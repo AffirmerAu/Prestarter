@@ -5,7 +5,7 @@ import { Portal } from "./pages/Portal";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
-  if (loading) return <p className="p-8 text-sm text-gray-500">Loading…</p>;
+  if (loading) return <p className="p-8 text-sm text-muted">Loading…</p>;
   if (!session) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

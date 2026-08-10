@@ -29,17 +29,29 @@ interface VideoLanguage {
 
 const RENEWAL_WINDOW_DAYS = 60;
 
+type Tone = "success" | "warning" | "error";
+
+const BANNER_TONE_CLASSES: Record<Tone, string> = {
+  success: "bg-primary-tint border-primary-tint-border text-primary-press",
+  warning: "bg-[#FFFAEB] border-[#FEDF89] text-[#93370D]",
+  error: "bg-[#FEF3F2] border-[#FECDCA] text-[#B42318]",
+};
+
 // Priority order when more than one condition applies at once (e.g. paused AND overdue) —
 // most restrictive wins, since that's the one the client actually needs to act on.
-function statusBanner(client: ClientStatus): string {
-  if (client.status === "paused") return "Your licence is currently paused. Please contact Affirmer.";
-  if (client.billing_state === "overdue") return "Access is paused pending payment. Please contact Affirmer.";
-  if (client.billing_state === "due") return "A payment is outstanding on your licence. Access continues for now.";
+function statusBanner(client: ClientStatus): { tone: Tone; word: string; detail: string } {
+  if (client.status === "paused") return { tone: "error", word: "Paused.", detail: "Please contact Affirmer." };
+  if (client.billing_state === "overdue") {
+    return { tone: "error", word: "Access paused.", detail: "Payment is required — contact Affirmer." };
+  }
+  if (client.billing_state === "due") {
+    return { tone: "warning", word: "Payment due.", detail: "Access continues for now." };
+  }
   const daysToRenewal = (new Date(client.term_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
   if (daysToRenewal <= RENEWAL_WINDOW_DAYS) {
-    return "Your licence is approaching its renewal date. Affirmer will be in touch.";
+    return { tone: "warning", word: "Renewal approaching.", detail: "Affirmer will be in touch." };
   }
-  return "Your licence is active.";
+  return { tone: "success", word: "Active.", detail: "Your licence is in good standing." };
 }
 
 export function Portal() {
@@ -77,7 +89,7 @@ export function Portal() {
     load();
   }, []);
 
-  if (!loaded) return <p className="p-8 text-sm text-gray-500">Loading…</p>;
+  if (!loaded) return <p className="p-8 text-sm text-muted">Loading…</p>;
 
   // A signed-in user with no matching client_contacts row (wrong email, or one never
   // provisioned for them) — client_safe_status legitimately returns zero rows via RLS.
@@ -85,13 +97,13 @@ export function Portal() {
   if (!client) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
-        <p className="text-sm text-gray-700">
-          No client account is set up for <span className="font-medium">{session?.user.email}</span>.
+        <p className="text-sm text-body">
+          No client account is set up for <span className="font-medium text-ink">{session?.user.email}</span>.
           Contact Affirmer to be added, or sign in with the correct email.
         </p>
         <button
           onClick={signOut}
-          className="mt-4 rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+          className="mt-4 rounded-input border border-line-strong px-3 py-1.5 text-sm text-body hover:bg-surface-sunken"
         >
           Sign out
         </button>
@@ -99,14 +111,20 @@ export function Portal() {
     );
   }
 
+  const banner = statusBanner(client);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-surface-sunken">
+      <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-          <span className="text-sm font-semibold text-gray-900">{client.name}</span>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            <span>{session?.user.email}</span>
-            <button onClick={signOut} className="text-gray-400 hover:text-gray-700">
+          <div className="flex items-center gap-3">
+            <img src="/brand/logo-horizontal.png" alt="Prestarter" className="h-[30px] w-auto" />
+            <span className="text-sm text-muted">by Affirmer</span>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="font-medium text-ink">{client.name}</span>
+            <span className="text-muted">{session?.user.email}</span>
+            <button onClick={signOut} className="text-subtle hover:text-body">
               Sign out
             </button>
           </div>
@@ -114,16 +132,16 @@ export function Portal() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
-        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 text-sm font-medium text-gray-900">
-          {statusBanner(client)}
+        <div className={`mb-6 rounded-[12px] border p-5 text-sm ${BANNER_TONE_CLASSES[banner.tone]}`}>
+          <span className="font-bold">{banner.word}</span> <span className="font-normal">{banner.detail}</span>
         </div>
 
         <div className="mb-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Your videos</h1>
+          <h1 className="text-h1 font-bold text-ink">Your videos</h1>
           {videos.length > 0 && (
             <button
               onClick={() => openAsset("/portal/poster.png")}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+              className="rounded-input border border-line-strong px-3 py-1.5 text-sm text-body hover:bg-surface-sunken"
             >
               Export poster
             </button>
@@ -138,11 +156,12 @@ export function Portal() {
               accessKey={accessKey}
             />
           ))}
-          {videos.length === 0 && <p className="text-sm text-gray-500">No videos licensed yet.</p>}
+          {videos.length === 0 && <p className="text-sm text-muted">No videos licensed yet.</p>}
         </div>
 
-        <footer className="mt-10 border-t border-gray-200 pt-4 text-xs text-gray-500">
-          Your organisation's name and the playback time appear discreetly on every play.
+        <footer className="mt-10 border-t border-line pt-4 text-xs text-muted">
+          <p className="mb-1">Your organisation's name and the playback time appear discreetly on every play.</p>
+          <p>Prestarter, by Affirmer.</p>
         </footer>
       </main>
     </div>

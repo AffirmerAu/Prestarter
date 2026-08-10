@@ -82,14 +82,14 @@ export function VideoRow({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-card border border-line bg-surface p-4">
       <div className="flex items-center gap-4">
-        <div className="flex aspect-video w-32 shrink-0 items-center justify-center rounded bg-gray-100 text-xs text-gray-400">
+        <div className="flex aspect-video w-32 shrink-0 items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
           {video.display_code}
         </div>
         <div className="flex-1">
-          <div className="font-medium text-gray-900">{video.title}</div>
-          <div className="text-sm text-gray-500">
+          <div className="font-medium text-ink">{video.title}</div>
+          <div className="text-sm text-muted">
             {formatDuration(video.duration_seconds)}
             {languages.length > 0 && ` · ${languages.map((l) => l.label_native).join(", ")}`}
           </div>
@@ -98,19 +98,19 @@ export function VideoRow({
           <button
             onClick={() => setPlaying((p) => !p)}
             disabled={!accessKey}
-            className="rounded bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+            className="rounded-input bg-primary px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover active:bg-primary-press disabled:opacity-50"
           >
             {playing ? "Hide player" : "Play"}
           </button>
           <button
             onClick={() => accessKey && openAsset(`/portal/videos/${video.id}/qr.png`)}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="rounded-input border border-line-strong px-3 py-1.5 text-sm text-body hover:bg-surface-sunken"
           >
             Download QR
           </button>
           <button
             onClick={() => setExpanded((e) => !e)}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="rounded-input border border-line-strong px-3 py-1.5 text-sm text-body hover:bg-surface-sunken"
           >
             {expanded ? "Hide link" : "Get link"}
           </button>
@@ -118,7 +118,7 @@ export function VideoRow({
       </div>
 
       {playing && playUrl && (
-        <div className="mt-4 aspect-video w-full overflow-hidden rounded border border-gray-200 bg-black">
+        <div className="mt-4 aspect-video w-full overflow-hidden rounded-[12px] border border-line bg-surface-inverse">
           <iframe
             src={playUrl}
             className="h-full w-full border-0"
@@ -129,15 +129,15 @@ export function VideoRow({
       )}
 
       {expanded && (
-        <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+        <div className="mt-4 space-y-3 border-t border-line pt-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded border border-gray-300 text-sm">
+            <div className="flex rounded-input border border-line-strong text-sm">
               {(["watch", "embed", "manifest"] as Format[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFormat(f)}
-                  className={`px-3 py-1 first:rounded-l last:rounded-r ${
-                    format === f ? "bg-gray-900 text-white" : "hover:bg-gray-50"
+                  className={`px-3 py-1.5 first:rounded-l-input last:rounded-r-input ${
+                    format === f ? "bg-primary text-white" : "text-body hover:bg-surface-sunken"
                   }`}
                 >
                   {f === "watch" ? "Watch page" : f === "embed" ? "Iframe embed" : "HLS manifest"}
@@ -145,7 +145,11 @@ export function VideoRow({
               ))}
             </div>
             {languages.length > 0 && (
-              <select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-sm">
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value)}
+                className="rounded-input border border-line-strong px-2 py-1.5 text-sm text-body focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/24"
+              >
                 <option value="">No language preselected</option>
                 {languages.map((l) => (
                   <option key={l.language_tag} value={l.language_tag}>
@@ -156,15 +160,21 @@ export function VideoRow({
             )}
           </div>
           <div className="flex gap-2">
-            <code ref={linkRef} className="flex-1 overflow-x-auto whitespace-nowrap rounded bg-gray-100 px-2 py-1.5 text-xs">
+            <code
+              ref={linkRef}
+              className="flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-surface-muted px-2 py-1.5 text-code font-mono text-body"
+            >
               {link}
             </code>
-            <button onClick={copyLink} className="shrink-0 rounded bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700">
+            <button
+              onClick={copyLink}
+              className="shrink-0 rounded-input bg-primary px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover active:bg-primary-press"
+            >
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
           {copyFailed && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-[#93370D]">
               Couldn't copy automatically — the link above is selected, use Ctrl/Cmd-C to copy it.
             </p>
           )}

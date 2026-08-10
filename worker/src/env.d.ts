@@ -8,4 +8,7 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY: string;
 
   ADDRESS_HASH_PEPPER: string;
+
+  RESEND_API_KEY: string;
+  EMAIL_FROM: string;
 }

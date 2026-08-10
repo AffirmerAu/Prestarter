@@ -2,8 +2,8 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 function navClass({ isActive }: { isActive: boolean }) {
-  return `rounded px-3 py-1.5 text-sm font-medium ${
-    isActive ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+  return `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+    isActive ? "bg-primary-tint text-primary-press" : "text-white/70 hover:bg-white/10 hover:text-white"
   }`;
 }
 
@@ -11,11 +11,14 @@ export function Layout() {
   const { session, signOut } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-surface-sunken">
+      <header className="bg-surface-inverse">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold text-gray-900">Prestarter admin</span>
+            <div className="flex items-center gap-2">
+              <img src="/brand/logo-horizontal-reverse.png" alt="Prestarter" className="h-[26px] w-auto" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Admin</span>
+            </div>
             <nav className="flex gap-1">
               <NavLink to="/" end className={navClass}>
                 Dashboard
@@ -28,9 +31,9 @@ export function Layout() {
               </NavLink>
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
+          <div className="flex items-center gap-3 text-sm text-white/60">
             <span>{session?.user.email}</span>
-            <button onClick={signOut} className="text-gray-400 hover:text-gray-700">
+            <button onClick={signOut} className="text-white/50 hover:text-white">
               Sign out
             </button>
           </div>
