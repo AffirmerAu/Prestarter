@@ -23,6 +23,10 @@ function addDaysISO(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function handleInternalAdmin(request: Request, url: URL, env: Env): Promise<Response> {
   const auth = await requireAdmin(request, env);
   if (!auth.ok) return auth.response;
@@ -45,6 +49,12 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
 
   const rotate = url.pathname.match(/^\/internal\/access-keys\/([^/]+)\/rotate$/);
   if (rotate?.[1]) return rotateAccessKey(env, rotate[1], auth.email);
+
+  const addEnt = url.pathname.match(/^\/internal\/clients\/([^/]+)\/entitlements$/);
+  if (addEnt?.[1]) return addEntitlement(env, addEnt[1], auth.email, await request.json());
+
+  const revokeEnt = url.pathname.match(/^\/internal\/entitlements\/([^/]+)\/revoke$/);
+  if (revokeEnt?.[1]) return revokeEntitlement(env, revokeEnt[1], auth.email);
 
   const ack = url.pathname.match(/^\/internal\/alerts\/([^/]+)\/acknowledge$/);
   if (ack?.[1]) return acknowledgeAlert(env, ack[1], auth.email);
@@ -150,6 +160,96 @@ async function rotateAccessKey(env: Env, accessKeyId: string, actor: string): Pr
   });
 
   return new Response(JSON.stringify({ key: newKey }), { headers: { "content-type": "application/json" } });
+}
+
+interface AddEntitlementBody {
+  video_id?: unknown;
+  effective_from?: unknown;
+  effective_to?: unknown;
+}
+
+// Grants a client access to a video (spec section 5). entitlements has a unique(client_id,
+// video_id) constraint, so re-adding a video the client was previously entitled to (and
+// later revoked from) hits the same row rather than a fresh one — reactivating it by
+// updating the effective window is simpler than modelling a full history of separate
+// entitlement windows per video, which nothing else in the spec calls for.
+async function addEntitlement(env: Env, clientId: string, actor: string, body: AddEntitlementBody): Promise<Response> {
+  const videoId = body.video_id;
+  if (typeof videoId !== "string" || !videoId.trim()) {
+    return new Response(JSON.stringify({ message: "video_id is required" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  const effectiveFrom = typeof body.effective_from === "string" && body.effective_from ? body.effective_from : todayISO();
+  const effectiveTo = typeof body.effective_to === "string" && body.effective_to ? body.effective_to : null;
+
+  const videos = await pgSelect<{ id: string }>(env, `videos?id=eq.${videoId}&select=id`);
+  if (!videos[0]) {
+    return new Response(JSON.stringify({ message: "Video not found" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const existing = await pgSelect<{ id: string }>(
+    env,
+    `entitlements?client_id=eq.${clientId}&video_id=eq.${videoId}&select=id`,
+  );
+  let entitlementId: string;
+  if (existing[0]) {
+    await pgPatch(env, `entitlements?id=eq.${existing[0].id}`, { effective_from: effectiveFrom, effective_to: effectiveTo });
+    entitlementId = existing[0].id;
+  } else {
+    const row = await pgInsert<{ id: string }>(env, "entitlements", {
+      client_id: clientId,
+      video_id: videoId,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo,
+    });
+    entitlementId = row.id;
+  }
+
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "add_entitlement",
+    subject_type: "clients",
+    subject_id: clientId,
+    detail: { video_id: videoId, effective_from: effectiveFrom, effective_to: effectiveTo },
+  });
+
+  return new Response(JSON.stringify({ id: entitlementId }), { headers: { "content-type": "application/json" } });
+}
+
+// Removing a video from a client sets effective_to = today rather than deleting the row —
+// entitlement.ts's checkEntitlement() cuts off access immediately either way (it checks
+// effective_to >= today), but this preserves the record of what the client WAS entitled to
+// and for how long, which the effective_from/effective_to columns exist for in the first
+// place. Re-adding the same video later reactivates this same row (see addEntitlement).
+async function revokeEntitlement(env: Env, entitlementId: string, actor: string): Promise<Response> {
+  const rows = await pgSelect<{ id: string; client_id: string; video_id: string }>(
+    env,
+    `entitlements?id=eq.${entitlementId}&select=id,client_id,video_id`,
+  );
+  const entitlement = rows[0];
+  if (!entitlement) {
+    return new Response(JSON.stringify({ message: "Entitlement not found" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const today = todayISO();
+  await pgPatch(env, `entitlements?id=eq.${entitlementId}`, { effective_to: today });
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "revoke_entitlement",
+    subject_type: "clients",
+    subject_id: entitlement.client_id,
+    detail: { video_id: entitlement.video_id, effective_to: today },
+  });
+
+  return new Response(JSON.stringify({ effective_to: today }), { headers: { "content-type": "application/json" } });
 }
 
 async function acknowledgeAlert(env: Env, alertId: string, actor: string): Promise<Response> {

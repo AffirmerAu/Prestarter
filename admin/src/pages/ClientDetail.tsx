@@ -39,6 +39,16 @@ interface ClientDetailData {
   billingEvents: { id: string; action: string; actor: string; occurred_at: string; reference: string | null }[];
 }
 
+interface CatalogueVideo {
+  id: string;
+  title: string;
+  display_code: string;
+}
+
+function isActiveEntitlement(effectiveTo: string | null): boolean {
+  return !effectiveTo || effectiveTo >= new Date().toISOString().slice(0, 10);
+}
+
 const cardClass = "rounded-card border border-line bg-surface p-5";
 const cardHeaderClass = "mb-3 border-b border-line pb-3 text-h3 font-semibold text-ink";
 const secondaryBtnClass =
@@ -51,11 +61,17 @@ const destructiveBtnClass =
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<ClientDetailData | null>(null);
+  const [catalogue, setCatalogue] = useState<CatalogueVideo[]>([]);
+  const [selectedVideoId, setSelectedVideoId] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const d = await apiGet<ClientDetailData>(`/internal/clients/${id}`);
+    const [d, videosResp] = await Promise.all([
+      apiGet<ClientDetailData>(`/internal/clients/${id}`),
+      apiGet<{ videos: CatalogueVideo[] }>("/internal/videos"),
+    ]);
     setData(d);
+    setCatalogue(videosResp.videos);
   }
 
   useEffect(() => {
@@ -85,9 +101,28 @@ export function ClientDetail() {
     setBusy(false);
   }
 
+  async function addVideo() {
+    if (!selectedVideoId) return;
+    setBusy(true);
+    await apiPost(`/internal/clients/${id}/entitlements`, { video_id: selectedVideoId });
+    setSelectedVideoId("");
+    await load();
+    setBusy(false);
+  }
+
+  async function removeVideo(entitlementId: string, title: string) {
+    if (!confirm(`Remove "${title}" from this client? Their existing links and posters for it will stop working immediately.`)) return;
+    setBusy(true);
+    await apiPost(`/internal/entitlements/${entitlementId}/revoke`, {});
+    await load();
+    setBusy(false);
+  }
+
   if (!data) return <p className="text-sm text-muted">Loading…</p>;
   const { client } = data;
   const activeKey = data.keys.find((k) => !k.revoked_at);
+  const entitledVideoIds = new Set(data.entitlements.filter((e) => isActiveEntitlement(e.effective_to)).map((e) => e.video_id));
+  const availableToAdd = catalogue.filter((v) => !entitledVideoIds.has(v.id));
 
   return (
     <div className="space-y-8">
@@ -163,38 +198,77 @@ export function ClientDetail() {
 
       <section className={cardClass}>
         <h2 className={cardHeaderClass}>Entitlements &amp; links</h2>
-        <ul className="divide-y divide-[#F2F4F7]">
-          {data.entitlements.map((e) => (
-            <li key={e.id} className="flex items-center justify-between py-2 text-sm">
-              <div>
-                <div className="font-medium text-ink">{e.videos.title}</div>
-                <div className="text-muted">{e.videos.display_code}</div>
-              </div>
-              {activeKey && (
-                <div className="flex gap-3">
-                  <button
-                    className="text-muted hover:underline"
-                    onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.svg`)}
-                  >
-                    QR (SVG)
-                  </button>
-                  <button
-                    className="text-muted hover:underline"
-                    onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.png`)}
-                  >
-                    QR (PNG)
-                  </button>
+        <ul className="mb-4 divide-y divide-[#F2F4F7]">
+          {data.entitlements.map((e) => {
+            const active = isActiveEntitlement(e.effective_to);
+            return (
+              <li key={e.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <div className="font-medium text-ink">
+                    {e.videos.title}
+                    {!active && (
+                      <span className="ml-2 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-xs font-semibold text-[#475467]">
+                        removed {e.effective_to}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted">{e.videos.display_code}</div>
                 </div>
-              )}
-            </li>
-          ))}
+                {active && (
+                  <div className="flex items-center gap-3">
+                    {activeKey && (
+                      <>
+                        <button
+                          className="text-muted hover:underline"
+                          onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.svg`)}
+                        >
+                          QR (SVG)
+                        </button>
+                        <button
+                          className="text-muted hover:underline"
+                          onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.png`)}
+                        >
+                          QR (PNG)
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => removeVideo(e.id, e.videos.title)}
+                      disabled={busy}
+                      className="text-[#B42318] hover:underline disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
           {data.entitlements.length === 0 && <li className="py-2 text-sm text-muted">No entitlements yet.</li>}
         </ul>
-        {activeKey && (
-          <button onClick={() => openAsset(`/internal/clients/${client.id}/poster.png`)} className={`mt-3 ${secondaryBtnClass}`}>
-            Export poster (PNG)
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+          <select
+            value={selectedVideoId}
+            onChange={(e) => setSelectedVideoId(e.target.value)}
+            className="rounded-input border border-line-strong px-2.5 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/24"
+          >
+            <option value="">Add a video…</option>
+            {availableToAdd.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.title} ({v.display_code})
+              </option>
+            ))}
+          </select>
+          <button onClick={addVideo} disabled={!selectedVideoId || busy} className={primaryBtnClass}>
+            Add
           </button>
-        )}
+          {activeKey && (
+            <button onClick={() => openAsset(`/internal/clients/${client.id}/poster.png`)} className={secondaryBtnClass}>
+              Export poster (PNG)
+            </button>
+          )}
+        </div>
       </section>
 
       <section className={cardClass}>
