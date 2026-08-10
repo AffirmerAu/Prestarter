@@ -3,6 +3,7 @@ import { pgSelect, pgInsert, pgPatch } from "./supabase";
 import { requireAdmin } from "./admin-auth";
 import { handleAdminReads } from "./admin-reads";
 import { handleCreateClient } from "./clients-admin";
+import { handleRegisterVideo } from "./videos-admin";
 import {
   handleCaptionUpload,
   handleMarkCaptionReviewed,
@@ -30,6 +31,8 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   if (url.pathname === "/internal/clients") return handleCreateClient(env, auth.email, await request.json());
+
+  if (url.pathname === "/internal/videos") return handleRegisterVideo(env, auth.email, await request.json());
 
   const markPaid = url.pathname.match(/^\/internal\/clients\/([^/]+)\/mark-paid$/);
   if (markPaid?.[1]) return markClientPaid(env, markPaid[1], auth.email, await request.json());

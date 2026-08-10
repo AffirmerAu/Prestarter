@@ -2,6 +2,7 @@ import type { Env } from "./env";
 import { pgSelect } from "./supabase";
 import { handleQrExport, handlePosterExport } from "./admin-export";
 import { getUnsyncedStreamCaptions, handleDownloadCaptionVtt } from "./captions";
+import { listUnregisteredStreamVideos } from "./videos-admin";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -87,11 +88,14 @@ async function clientDetailHandler(env: Env, clientId: string): Promise<Response
 }
 
 async function listVideos(env: Env): Promise<Response> {
-  const videos = await pgSelect(
-    env,
-    "videos?select=id,display_code,title,duration_seconds,category,status,stream_uid&order=title.asc",
-  );
-  return json(videos);
+  const [videos, unregisteredStreamVideos] = await Promise.all([
+    pgSelect(env, "videos?select=id,display_code,title,duration_seconds,category,status,stream_uid&order=title.asc"),
+    // Videos that exist on Cloudflare Stream but have no videos row yet — same "uploaded
+    // outside this console" situation captions can end up in. Defensive catch: a Stream API
+    // hiccup here shouldn't take down the whole video library list.
+    listUnregisteredStreamVideos(env).catch(() => []),
+  ]);
+  return json({ videos, unregisteredStreamVideos });
 }
 
 async function videoDetailHandler(env: Env, videoId: string): Promise<Response> {
