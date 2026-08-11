@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { pgInsert } from "./supabase";
+import { pgInsert, pgPatch, pgSelect } from "./supabase";
 import { sendOnboardingEmail } from "./email";
 
 function json(data: unknown, status = 200): Response {
@@ -136,4 +136,61 @@ export async function handleCreateClient(env: Env, actorEmail: string, body: Cre
   }
 
   return json({ id: client.id, access_key: accessKey, onboarding_email_sent: onboardingEmailSent });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface UpdateContactEmailBody {
+  email?: unknown;
+}
+
+// A client contact's email is also their Supabase Auth login — changing it has to update
+// both the client_contacts row (what the admin UI shows) and the underlying Auth user (what
+// actually gates sign-in), or the old address would keep working for login while the new one
+// wouldn't yet exist as a real account. Checks for a conflicting email first rather than
+// relying on the DB's unique constraint to fail the request, since a thrown 409 from
+// pgPatch would otherwise surface as a generic 500 — there's no catch-all error handler
+// wrapping admin routes (each handler is expected to validate before mutating).
+export async function updateContactEmail(env: Env, actor: string, contactId: string, body: UpdateContactEmailBody): Promise<Response> {
+  const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (!newEmail || !EMAIL_RE.test(newEmail)) {
+    return json({ message: "A valid email is required" }, 400);
+  }
+
+  const contacts = await pgSelect<{ id: string; client_id: string; user_id: string | null; email: string }>(
+    env,
+    `client_contacts?id=eq.${contactId}&select=id,client_id,user_id,email`,
+  );
+  const contact = contacts[0];
+  if (!contact) return json({ message: "Contact not found" }, 404);
+  if (contact.email.toLowerCase() === newEmail) return json({ id: contact.id, email: contact.email });
+
+  const conflicting = await pgSelect<{ id: string }>(env, `client_contacts?email=eq.${encodeURIComponent(newEmail)}&select=id`);
+  if (conflicting.length > 0) return json({ message: "That email is already in use by another contact" }, 409);
+
+  if (contact.user_id) {
+    const authRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${contact.user_id}`, {
+      method: "PUT",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: newEmail, email_confirm: true }),
+    });
+    if (!authRes.ok) {
+      return json({ message: "Could not update the sign-in account for this email" }, 502);
+    }
+  }
+
+  await pgPatch(env, `client_contacts?id=eq.${contactId}`, { email: newEmail });
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "update_contact_email",
+    subject_type: "clients",
+    subject_id: contact.client_id,
+    detail: { contact_id: contact.id, old_email: contact.email, new_email: newEmail },
+  });
+
+  return json({ id: contact.id, email: newEmail });
 }

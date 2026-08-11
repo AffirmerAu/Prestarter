@@ -27,10 +27,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function sendMagicLink(email: string) {
+    // shouldCreateUser: false — only an email an admin already registered as a client
+    // contact (client_contacts, provisioned via the admin console) can sign in. Without
+    // this, Supabase's default behaviour silently creates a brand-new Auth user for any
+    // email that asks for a magic link, which would let an unregistered address obtain a
+    // real session (RLS then shows them no data, but the login itself should already refuse
+    // an unregistered address, not just leave them looking at an empty portal).
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, shouldCreateUser: false },
     });
+    if (error && /not allowed|not found|signups/i.test(error.message)) {
+      return { error: "That email isn't registered for a Prestarter account. Contact your Affirmer representative." };
+    }
     return { error: error?.message ?? null };
   }
 

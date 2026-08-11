@@ -44,10 +44,30 @@ export function Videos() {
   const [fields, setFields] = useState<Record<string, RegisterFields>>({});
   const [registering, setRegistering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   async function load() {
     const d = await apiGet<VideosResponse>("/internal/videos");
     setData(d);
+  }
+
+  async function removeVideo(e: React.MouseEvent, video: VideoRow) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Remove "${video.title}" from the library? Clients currently entitled to it lose access immediately.`)) return;
+    setBusy(video.id);
+    await apiPost(`/internal/videos/${video.id}/archive`, {});
+    await load();
+    setBusy(null);
+  }
+
+  async function restoreVideoTile(e: React.MouseEvent, video: VideoRow) {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(video.id);
+    await apiPost(`/internal/videos/${video.id}/restore`, {});
+    await load();
+    setBusy(null);
   }
 
   useEffect(() => {
@@ -90,21 +110,41 @@ export function Videos() {
       <div>
         <h1 className="mb-4 text-h1 font-bold text-ink">Video library</h1>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {data.videos.map((v) => (
-            <Link
-              key={v.id}
-              to={`/videos/${v.id}`}
-              className="rounded-card border border-line bg-surface p-4 transition-colors hover:border-line-strong"
-            >
-              <div className="mb-2 flex aspect-video items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
-                {v.display_code}
-              </div>
-              <div className="text-sm font-medium text-ink">{v.title}</div>
-              <div className="text-xs text-muted">
-                {v.category} · {formatDuration(v.duration_seconds)} · {v.status}
-              </div>
-            </Link>
-          ))}
+          {data.videos.map((v) => {
+            const archived = v.status === "archived";
+            return (
+              <Link
+                key={v.id}
+                to={`/videos/${v.id}`}
+                className={`rounded-card border border-line bg-surface p-4 transition-colors hover:border-line-strong ${archived ? "opacity-50" : ""}`}
+              >
+                <div className="mb-2 flex aspect-video items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
+                  {v.display_code}
+                </div>
+                <div className="text-sm font-medium text-ink">{v.title}</div>
+                <div className="mb-2 text-xs text-muted">
+                  {v.category} · {formatDuration(v.duration_seconds)} · {v.status}
+                </div>
+                {archived ? (
+                  <button
+                    onClick={(e) => restoreVideoTile(e, v)}
+                    disabled={busy === v.id}
+                    className="text-xs font-medium text-primary-press hover:underline disabled:opacity-50"
+                  >
+                    {busy === v.id ? "Restoring…" : "Restore"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => removeVideo(e, v)}
+                    disabled={busy === v.id}
+                    className="text-xs font-medium text-[#B42318] hover:underline disabled:opacity-50"
+                  >
+                    {busy === v.id ? "Removing…" : "Remove"}
+                  </button>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </div>
 

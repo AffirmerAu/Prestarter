@@ -23,6 +23,7 @@ interface ClientRow {
 interface VideoRow {
   id: string;
   stream_uid: string;
+  status: string;
 }
 interface EntitlementRow {
   effective_from: string;
@@ -74,9 +75,13 @@ export async function checkEntitlement(
   if (client.billing_state === "overdue") return { ok: false };
   if (today > addDays(client.paid_to, client.grace_days)) return { ok: false };
 
-  const videos = await pgSelect<VideoRow>(env, `videos?id=eq.${videoId}&select=id,stream_uid`);
+  const videos = await pgSelect<VideoRow>(env, `videos?id=eq.${videoId}&select=id,stream_uid,status`);
   const video = videos[0];
   if (!video) return { ok: false };
+  // Belt and suspenders: archiving a video (videos-admin.ts's archiveVideo) already revokes
+  // every active entitlement for it, but check status here too in case one is ever somehow
+  // left open.
+  if (video.status === "archived") return { ok: false };
 
   const entitlements = await pgSelect<EntitlementRow>(
     env,

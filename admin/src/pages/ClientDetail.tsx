@@ -43,6 +43,7 @@ interface CatalogueVideo {
   id: string;
   title: string;
   display_code: string;
+  status: string;
 }
 
 function isActiveEntitlement(effectiveTo: string | null): boolean {
@@ -64,6 +65,9 @@ export function ClientDetail() {
   const [catalogue, setCatalogue] = useState<CatalogueVideo[]>([]);
   const [selectedVideoId, setSelectedVideoId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editEmailValue, setEditEmailValue] = useState("");
+  const [editEmailError, setEditEmailError] = useState<string | null>(null);
 
   async function load() {
     const [d, videosResp] = await Promise.all([
@@ -118,11 +122,38 @@ export function ClientDetail() {
     setBusy(false);
   }
 
+  function startEditEmail(contactId: string, currentEmail: string) {
+    setEditingContactId(contactId);
+    setEditEmailValue(currentEmail);
+    setEditEmailError(null);
+  }
+
+  function cancelEditEmail() {
+    setEditingContactId(null);
+    setEditEmailValue("");
+    setEditEmailError(null);
+  }
+
+  async function saveEmail(contactId: string) {
+    setBusy(true);
+    setEditEmailError(null);
+    try {
+      await apiPost(`/internal/client-contacts/${contactId}/update-email`, { email: editEmailValue.trim() });
+      setEditingContactId(null);
+      setEditEmailValue("");
+      await load();
+    } catch {
+      setEditEmailError("Couldn't update the email — it may already be in use by another contact.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!data) return <p className="text-sm text-muted">Loading…</p>;
   const { client } = data;
   const activeKey = data.keys.find((k) => !k.revoked_at);
   const entitledVideoIds = new Set(data.entitlements.filter((e) => isActiveEntitlement(e.effective_to)).map((e) => e.video_id));
-  const availableToAdd = catalogue.filter((v) => !entitledVideoIds.has(v.id));
+  const availableToAdd = catalogue.filter((v) => !entitledVideoIds.has(v.id) && v.status !== "archived");
 
   return (
     <div className="space-y-8">
@@ -170,11 +201,38 @@ export function ClientDetail() {
 
         <div className={cardClass}>
           <h2 className={cardHeaderClass}>Contacts</h2>
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-2 text-sm">
             {data.contacts.map((c) => (
-              <li key={c.id} className="flex justify-between">
-                <span className="text-ink">{c.name}</span>
-                <span className="text-muted">{c.email}</span>
+              <li key={c.id}>
+                {editingContactId === c.id ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-ink">{c.name}</span>
+                    <input
+                      type="email"
+                      value={editEmailValue}
+                      onChange={(e) => setEditEmailValue(e.target.value)}
+                      className="flex-1 rounded-input border border-line-strong px-2 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/24"
+                      autoFocus
+                    />
+                    <button onClick={() => saveEmail(c.id)} disabled={busy || !editEmailValue.trim()} className="text-xs font-medium text-primary-press hover:underline disabled:opacity-50">
+                      Save
+                    </button>
+                    <button onClick={cancelEditEmail} disabled={busy} className="text-xs font-medium text-muted hover:underline disabled:opacity-50">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-ink">{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted">{c.email}</span>
+                      <button onClick={() => startEditEmail(c.id, c.email)} className="text-xs font-medium text-muted hover:underline">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {editingContactId === c.id && editEmailError && <p className="mt-1 text-xs text-[#B42318]">{editEmailError}</p>}
               </li>
             ))}
             {data.contacts.length === 0 && <li className="text-muted">No contacts yet.</li>}

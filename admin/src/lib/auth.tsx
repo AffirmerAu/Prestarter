@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
-  sendMagicLink: (email: string) => Promise<{ error: string | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -26,11 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  async function sendMagicLink(email: string) {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
+  // Password-only, deliberately — the admin console has exactly one real login, and a
+  // magic-link option here would mean anyone with inbox access to that one address could
+  // sign in without ever knowing the password. Supabase's own errors for bad credentials are
+  // fine to surface as-is (unlike the portal's OTP-disabled error, there's nothing here that
+  // needs rewording for a non-technical reader).
+  async function signInWithPassword(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   }
 
@@ -39,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, sendMagicLink, signOut }}>
+    <AuthContext.Provider value={{ session, loading, signInWithPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );

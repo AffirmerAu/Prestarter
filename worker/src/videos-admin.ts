@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { pgSelect, pgInsert } from "./supabase";
+import { pgSelect, pgInsert, pgPatch } from "./supabase";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -121,4 +121,78 @@ export async function handleRegisterVideo(env: Env, actorEmail: string, body: Re
   });
 
   return json({ id: row.id });
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Removing a video from the library (user-reported need: "the ability to remove videos from
+// the library") archives it rather than deleting the row — entitlements, play_events,
+// usage_daily and audit_log all foreign-key to videos.id, and hard-deleting would silently
+// destroy real usage/audit history along with it. Also revokes every currently-active
+// entitlement for the video (same "yesterday" trick as revokeEntitlement in admin.ts) so
+// existing clients lose access immediately rather than the archive being purely cosmetic —
+// checkEntitlement() and addEntitlement() additionally refuse an archived video as
+// belt-and-suspenders, matching this codebase's existing db-layer-not-just-UI convention.
+export async function archiveVideo(env: Env, actor: string, videoId: string): Promise<Response> {
+  const videos = await pgSelect<{ id: string; status: string }>(env, `videos?id=eq.${videoId}&select=id,status`);
+  const video = videos[0];
+  if (!video) return json({ message: "Video not found" }, 404);
+  if (video.status === "archived") return json({ id: video.id, status: "archived" });
+
+  const yesterday = addDaysISO(todayISO(), -1);
+  const activeEntitlements = await pgSelect<{ id: string }>(
+    env,
+    `entitlements?video_id=eq.${videoId}&effective_to=is.null&select=id`,
+  );
+  await Promise.all(activeEntitlements.map((e) => pgPatch(env, `entitlements?id=eq.${e.id}`, { effective_to: yesterday })));
+  // Entitlements with a still-future effective_to (rare — only via a manually-set date) need
+  // the same cutoff; the is.null query above can't also express ">= today", so a second pass.
+  const openEndedFuture = await pgSelect<{ id: string; effective_to: string | null }>(
+    env,
+    `entitlements?video_id=eq.${videoId}&effective_to=gte.${todayISO()}&select=id,effective_to`,
+  );
+  await Promise.all(openEndedFuture.map((e) => pgPatch(env, `entitlements?id=eq.${e.id}`, { effective_to: yesterday })));
+
+  await pgPatch(env, `videos?id=eq.${videoId}`, { status: "archived" });
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "archive_video",
+    subject_type: "videos",
+    subject_id: videoId,
+    detail: { revoked_entitlements: activeEntitlements.length + openEndedFuture.length },
+  });
+
+  return json({ id: videoId, status: "archived" });
+}
+
+// Restoring always lands back on 'draft' (same status a freshly-registered video gets) —
+// there's no history of what status a video held before archiving, and nothing in this app
+// currently drives videos into 'released' anyway. Does NOT restore any revoked entitlements;
+// an admin re-adds the video per client explicitly, same as reactivating any other
+// entitlement (mirrors ClientDetail's add/remove flow rather than silently re-granting
+// access to clients who may no longer be meant to have it).
+export async function restoreVideo(env: Env, actor: string, videoId: string): Promise<Response> {
+  const videos = await pgSelect<{ id: string; status: string }>(env, `videos?id=eq.${videoId}&select=id,status`);
+  const video = videos[0];
+  if (!video) return json({ message: "Video not found" }, 404);
+  if (video.status !== "archived") return json({ id: video.id, status: video.status });
+
+  await pgPatch(env, `videos?id=eq.${videoId}`, { status: "draft" });
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "restore_video",
+    subject_type: "videos",
+    subject_id: videoId,
+    detail: {},
+  });
+
+  return json({ id: videoId, status: "draft" });
 }

@@ -2,8 +2,8 @@ import type { Env } from "./env";
 import { pgSelect, pgInsert, pgPatch } from "./supabase";
 import { requireAdmin } from "./admin-auth";
 import { handleAdminReads } from "./admin-reads";
-import { handleCreateClient } from "./clients-admin";
-import { handleRegisterVideo } from "./videos-admin";
+import { handleCreateClient, updateContactEmail } from "./clients-admin";
+import { handleRegisterVideo, archiveVideo, restoreVideo } from "./videos-admin";
 import {
   handleCaptionUpload,
   handleMarkCaptionReviewed,
@@ -38,6 +38,12 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
 
   if (url.pathname === "/internal/videos") return handleRegisterVideo(env, auth.email, await request.json());
 
+  const archiveVid = url.pathname.match(/^\/internal\/videos\/([^/]+)\/archive$/);
+  if (archiveVid?.[1]) return archiveVideo(env, auth.email, archiveVid[1]);
+
+  const restoreVid = url.pathname.match(/^\/internal\/videos\/([^/]+)\/restore$/);
+  if (restoreVid?.[1]) return restoreVideo(env, auth.email, restoreVid[1]);
+
   const markPaid = url.pathname.match(/^\/internal\/clients\/([^/]+)\/mark-paid$/);
   if (markPaid?.[1]) return markClientPaid(env, markPaid[1], auth.email, await request.json());
 
@@ -49,6 +55,9 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
 
   const rotate = url.pathname.match(/^\/internal\/access-keys\/([^/]+)\/rotate$/);
   if (rotate?.[1]) return rotateAccessKey(env, rotate[1], auth.email);
+
+  const updateEmail = url.pathname.match(/^\/internal\/client-contacts\/([^/]+)\/update-email$/);
+  if (updateEmail?.[1]) return updateContactEmail(env, auth.email, updateEmail[1], await request.json());
 
   const addEnt = url.pathname.match(/^\/internal\/clients\/([^/]+)\/entitlements$/);
   if (addEnt?.[1]) return addEntitlement(env, addEnt[1], auth.email, await request.json());
@@ -184,10 +193,16 @@ async function addEntitlement(env: Env, clientId: string, actor: string, body: A
   const effectiveFrom = typeof body.effective_from === "string" && body.effective_from ? body.effective_from : todayISO();
   const effectiveTo = typeof body.effective_to === "string" && body.effective_to ? body.effective_to : null;
 
-  const videos = await pgSelect<{ id: string }>(env, `videos?id=eq.${videoId}&select=id`);
+  const videos = await pgSelect<{ id: string; status: string }>(env, `videos?id=eq.${videoId}&select=id,status`);
   if (!videos[0]) {
     return new Response(JSON.stringify({ message: "Video not found" }), {
       status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  if (videos[0].status === "archived") {
+    return new Response(JSON.stringify({ message: "This video has been removed from the library and can't be added to a client" }), {
+      status: 400,
       headers: { "content-type": "application/json" },
     });
   }
