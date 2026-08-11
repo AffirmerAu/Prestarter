@@ -141,7 +141,7 @@ function buildSheet(clientName: string, videos: PosterVideo[], sheetLabel?: stri
     affirmerLockup(PAGE_W - MARGIN, 39, 34) +
     `<text x="${MARGIN}" y="158" font-family="Poppins" font-weight="700" font-size="56" letter-spacing="-1.68" fill="#101828">Workplace Safety Training</text>` +
     `<text x="${MARGIN}" y="214" font-family="Poppins SemiBold" font-size="34" letter-spacing="-0.51" fill="#475467">${escapeXml(clientName)}</text>` +
-    `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="999" fill="#1F9D57"/>` +
+    `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="25" fill="#1F9D57"/>` +
     `<text x="${pillX + pillW / 2}" y="${pillY + pillH / 2 + 9}" text-anchor="middle" font-family="Poppins SemiBold" font-size="25" fill="#FFFFFF">Scan a code to watch</text>` +
     tiles +
     // Footer
