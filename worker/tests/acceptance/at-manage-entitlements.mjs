@@ -67,7 +67,7 @@ const adminToken = await signInAsAdmin();
 // Throwaway client — doesn't need a real Stream video since entitlements only reference
 // videos.id, and this test never mints a playback token.
 const [video] = (
-  await rest("videos?select=id&limit=1")
+  await rest("videos?select=id,title&limit=1")
 ).body ?? [];
 if (!video) throw new Error("Expected at least one video to exist already — check seed state.");
 
@@ -114,6 +114,16 @@ try {
   const beforeToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
   check("playback succeeds before revoke (real /api/token check, not just the DB row)", beforeToken.status === 200, `status ${beforeToken.status}`);
 
+  async function posterHasVideo() {
+    const svg = await fetch(`${WORKER_URL}/internal/clients/${client.id}/poster.svg`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    }).then((r) => r.text());
+    return svg.includes(video.title);
+  }
+  // --- The poster export must reflect the same active window as real playback — a revoked
+  // entitlement printing a QR that then 403s on scan is exactly the bug this checks for. ---
+  check("video's title appears on the poster before revoke", await posterHasVideo());
+
   // --- Missing video_id rejected ---
   const badRes = await fetch(`${WORKER_URL}/internal/clients/${client.id}/entitlements`, {
     method: "POST",
@@ -152,6 +162,7 @@ try {
   // that the DB row changed to some value ---
   const afterToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
   check("playback is refused immediately after revoke (real /api/token check)", afterToken.status === 403, `status ${afterToken.status}`);
+  check("video's title no longer appears on the poster after revoke", !(await posterHasVideo()));
 
   const auditRows = (
     await rest(
@@ -177,6 +188,7 @@ try {
 
   const reactivatedToken = await fetch(`${WORKER_URL}/api/token?videoId=${video.id}&k=${accessKey}`);
   check("playback works again after re-adding (real /api/token check)", reactivatedToken.status === 200, `status ${reactivatedToken.status}`);
+  check("video's title appears on the poster again after re-adding", await posterHasVideo());
 } finally {
   await rest(`clients?id=eq.${client.id}`, { method: "DELETE" }); // cascades entitlements
 }

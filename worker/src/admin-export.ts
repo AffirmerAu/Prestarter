@@ -12,6 +12,18 @@ async function pngResponse(svg: string, widthPx: number): Promise<Response> {
   return new Response(png, { headers: { "content-type": "image/png" } });
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Same inclusive-window predicate entitlement.ts's checkEntitlement() uses for real playback
+// authorization — a revoked (effective_to in the past) or not-yet-started entitlement must not
+// print a QR code that then 403s when scanned.
+function isActiveEntitlement(effectiveFrom: string, effectiveTo: string | null): boolean {
+  const today = todayISO();
+  return effectiveFrom <= today && (effectiveTo === null || effectiveTo >= today);
+}
+
 function buildWatchUrl(baseUrl: string, videoId: string, accessKey: string, opts: { src: string; lang?: string }): string {
   const url = new URL(`/w/${videoId}`, baseUrl);
   url.searchParams.set("k", accessKey);
@@ -54,10 +66,12 @@ export async function handlePosterExport(
   const [clients, key, entitlements] = await Promise.all([
     pgSelect<{ id: string; name: string }>(env, `clients?id=eq.${clientId}&select=id,name`),
     activeAccessKey(env, clientId),
-    pgSelect<{ video_id: string; videos: { id: string; title: string; duration_seconds: number } }>(
-      env,
-      `entitlements?client_id=eq.${clientId}&select=video_id,videos(id,title,duration_seconds)`,
-    ),
+    pgSelect<{
+      video_id: string;
+      effective_from: string;
+      effective_to: string | null;
+      videos: { id: string; title: string; duration_seconds: number };
+    }>(env, `entitlements?client_id=eq.${clientId}&select=video_id,effective_from,effective_to,videos(id,title,duration_seconds)`),
   ]);
   const client = clients[0];
   if (!client) return new Response(JSON.stringify({ message: "Client not found" }), { status: 404 });
@@ -65,7 +79,7 @@ export async function handlePosterExport(
 
   const baseUrl = new URL(request.url).origin;
   const videos: PosterVideo[] = entitlements
-    .filter((e) => e.videos)
+    .filter((e) => e.videos && isActiveEntitlement(e.effective_from, e.effective_to))
     .map((e) => ({
       title: e.videos.title,
       durationSeconds: e.videos.duration_seconds,
