@@ -1,6 +1,12 @@
-// Seeds the admins table: the real admin (Matt, no password — signs in via magic link
-// later) and a password-based test admin used only by the acceptance test scripts.
-// Usage: node seed-admins.mjs
+// Seeds the admins table: the single real admin account (password-only login, no magic
+// link — see worker/src/admin-auth.ts's amr check) and a separate password-based test admin
+// used only by the acceptance test scripts.
+//
+// The real admin's password is deliberately NOT hardcoded here — set REAL_ADMIN_PASSWORD in
+// the environment before running this on a fresh Supabase project. Without it, this script
+// leaves that account's password untouched (or, on a brand-new project with no such user
+// yet, skips creating it and just prints a reminder).
+// Usage: REAL_ADMIN_PASSWORD=... node seed-admins.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,12 +80,17 @@ async function upsertAdmin(userId, email, name) {
   return row.id;
 }
 
-const matt = { email: "matt@affirmer.com.au", name: "Matt" };
-const mattUserId = await upsertUser(matt.email, undefined); // no password — magic link only
-await upsertAdmin(mattUserId, matt.email, matt.name);
+const realAdmin = { email: "admin@affirmer.com.au", name: "Affirmer Admin" };
+let realAdminUserId = null;
+if (process.env.REAL_ADMIN_PASSWORD) {
+  realAdminUserId = await upsertUser(realAdmin.email, process.env.REAL_ADMIN_PASSWORD);
+  await upsertAdmin(realAdminUserId, realAdmin.email, realAdmin.name);
+} else {
+  console.log(`REAL_ADMIN_PASSWORD not set — skipping ${realAdmin.email}. Re-run with it set to (re)provision that account.`);
+}
 
 const testAdmin = { email: "admin-test@example.com", password: "Test-Passw0rd-Admin!", name: "Test Admin" };
 const testAdminUserId = await upsertUser(testAdmin.email, testAdmin.password);
 await upsertAdmin(testAdminUserId, testAdmin.email, testAdmin.name);
 
-console.log(JSON.stringify({ matt: { userId: mattUserId, email: matt.email }, testAdmin }, null, 2));
+console.log(JSON.stringify({ realAdmin: realAdminUserId ? { userId: realAdminUserId, email: realAdmin.email } : null, testAdmin }, null, 2));
