@@ -1,5 +1,6 @@
 import type { Env } from "./env";
-import { pgSelect, pgInsert, pgPatch } from "./supabase";
+import { pgSelect, pgInsert, pgPatch, pgDelete } from "./supabase";
+import { deleteThumbnail } from "./thumbnails";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -195,4 +196,62 @@ export async function restoreVideo(env: Env, actor: string, videoId: string): Pr
   });
 
   return json({ id: videoId, status: "draft" });
+}
+
+// Fully deletes an archived video — irreversible, per user request ("the ability to fully
+// delete courses after they are removed from the video library"). Only allowed once a video
+// is already archived (archiveVideo already revoked every active entitlement for it, so
+// nothing here needs to touch client access again).
+//
+// video_languages, entitlements, play_events and usage_daily all have `on delete cascade` to
+// videos.id (0001_initial_schema.sql) — deleting the row wipes all of that with it, including
+// real play/usage history, by explicit user decision (confirmed: "wipe everything" over
+// "block if there's usage history"). alerts.video_id and videos.replaces_video_id have no
+// cascade, so those are nulled out first rather than left to throw a foreign key error —
+// alerts keep their own record, just detached from a video that no longer exists.
+//
+// Also attempts to delete the underlying Cloudflare Stream asset — best-effort, by explicit
+// user decision. The CF_STREAM_API_TOKEN configured for this project can register/list/manage
+// captions on Stream but returns 405 "Method not allowed for this authentication scheme" on
+// video DELETE specifically (confirmed empirically against a real request, not specific to
+// any one video) — a token permission gap, not something this code can fix. Rather than block
+// "fully delete" entirely until that's resolved in the Cloudflare dashboard, our own records
+// are deleted regardless of whether Stream cleanup succeeds; the outcome is recorded in
+// audit_log so an admin can see which videos still have an orphaned (and still
+// storage-billed) file on Stream and needs a manual follow-up.
+export async function deleteVideo(env: Env, actor: string, videoId: string): Promise<Response> {
+  const videos = await pgSelect<{ id: string; title: string; display_code: string; stream_uid: string; status: string }>(
+    env,
+    `videos?id=eq.${videoId}&select=id,title,display_code,stream_uid,status`,
+  );
+  const video = videos[0];
+  if (!video) return json({ message: "Video not found" }, 404);
+  if (video.status !== "archived") {
+    return json({ message: "Remove this video from the library first — only an already-removed video can be fully deleted" }, 400);
+  }
+
+  const streamDeleteRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/stream/${video.stream_uid}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${env.CF_STREAM_API_TOKEN}` },
+  }).catch(() => null);
+  const streamDeleted = streamDeleteRes !== null && (streamDeleteRes.ok || streamDeleteRes.status === 404);
+
+  await pgPatch(env, `alerts?video_id=eq.${videoId}`, { video_id: null });
+  await pgPatch(env, `videos?replaces_video_id=eq.${videoId}`, { replaces_video_id: null });
+  await deleteThumbnail(env, videoId);
+
+  await pgDelete(env, `videos?id=eq.${videoId}`);
+
+  await pgInsert(env, "audit_log", {
+    actor,
+    action: "delete_video",
+    subject_type: "videos",
+    subject_id: videoId,
+    // The video row (and everything cascaded with it) is gone now — using the fields
+    // captured before the delete, since nothing is left to look it up by afterward.
+    // stream_deleted: false means the Stream asset is orphaned and needs manual cleanup.
+    detail: { title: video.title, display_code: video.display_code, stream_uid: video.stream_uid, stream_deleted: streamDeleted },
+  });
+
+  return json({ id: videoId, deleted: true, stream_deleted: streamDeleted });
 }

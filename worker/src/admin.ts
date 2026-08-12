@@ -3,7 +3,8 @@ import { pgSelect, pgInsert, pgPatch } from "./supabase";
 import { requireAdmin } from "./admin-auth";
 import { handleAdminReads } from "./admin-reads";
 import { handleCreateClient, updateContactEmail } from "./clients-admin";
-import { handleRegisterVideo, archiveVideo, restoreVideo } from "./videos-admin";
+import { handleRegisterVideo, archiveVideo, restoreVideo, deleteVideo } from "./videos-admin";
+import { handleUploadThumbnail } from "./thumbnails";
 import {
   handleCaptionUpload,
   handleMarkCaptionReviewed,
@@ -43,6 +44,12 @@ export async function handleInternalAdmin(request: Request, url: URL, env: Env):
 
   const restoreVid = url.pathname.match(/^\/internal\/videos\/([^/]+)\/restore$/);
   if (restoreVid?.[1]) return restoreVideo(env, auth.email, restoreVid[1]);
+
+  const deleteVid = url.pathname.match(/^\/internal\/videos\/([^/]+)\/delete$/);
+  if (deleteVid?.[1]) return deleteVideo(env, auth.email, deleteVid[1]);
+
+  const uploadThumbnail = url.pathname.match(/^\/internal\/videos\/([^/]+)\/thumbnail$/);
+  if (uploadThumbnail?.[1]) return handleUploadThumbnail(request, env, uploadThumbnail[1]);
 
   const markPaid = url.pathname.match(/^\/internal\/clients\/([^/]+)\/mark-paid$/);
   if (markPaid?.[1]) return markClientPaid(env, markPaid[1], auth.email, await request.json());

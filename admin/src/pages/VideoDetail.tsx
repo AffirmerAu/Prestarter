@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiGet, apiPost, apiPostForm, downloadAsset, BASE } from "../lib/api";
+import { VideoThumbnail } from "../components/VideoThumbnail";
 
 interface VideoLanguage {
   id: string;
@@ -45,6 +46,10 @@ export function VideoDetail() {
   const [syncLabels, setSyncLabels] = useState<Record<string, string>>({});
   const [registering, setRegistering] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const thumbnailInput = useRef<HTMLInputElement>(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [thumbnailVersion, setThumbnailVersion] = useState(0);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
 
   async function load() {
     const d = await apiGet<VideoDetailData>(`/internal/videos/${id}`);
@@ -76,6 +81,24 @@ export function VideoDetail() {
     if (labelInput.current) labelInput.current.value = "";
     await load();
     setUploading(false);
+  }
+
+  async function uploadThumbnail(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingThumbnail(true);
+    setThumbnailError(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      await apiPostForm(`/internal/videos/${id}/thumbnail`, form);
+      setThumbnailVersion((v) => v + 1);
+    } catch {
+      setThumbnailError("Couldn't upload that image — it must be a JPEG, PNG or WebP under 5MB.");
+    } finally {
+      setUploadingThumbnail(false);
+      if (thumbnailInput.current) thumbnailInput.current.value = "";
+    }
   }
 
   async function markReviewed(languageId: string) {
@@ -121,6 +144,31 @@ export function VideoDetail() {
           {data.video.display_code} · {data.video.status}
         </p>
       </div>
+
+      <section className={cardClass}>
+        <h2 className={cardHeaderClass}>Thumbnail</h2>
+        <div className="flex items-end gap-4">
+          <VideoThumbnail
+            videoId={data.video.id}
+            displayCode={data.video.display_code}
+            version={thumbnailVersion}
+            className="aspect-video w-48 rounded-[12px] border border-line"
+          />
+          <div>
+            <input
+              ref={thumbnailInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={uploadThumbnail}
+              disabled={uploadingThumbnail}
+              className="text-sm text-body"
+            />
+            <p className="mt-1 text-xs text-muted">JPEG, PNG or WebP, up to 5MB. Replaces the current thumbnail.</p>
+            {uploadingThumbnail && <p className="mt-1 text-xs text-muted">Uploading…</p>}
+            {thumbnailError && <p className="mt-1 text-xs text-[#B42318]">{thumbnailError}</p>}
+          </div>
+        </div>
+      </section>
 
       <section className={cardClass}>
         <h2 className={cardHeaderClass}>Review player</h2>

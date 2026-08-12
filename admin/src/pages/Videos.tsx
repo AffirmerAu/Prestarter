@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
+import { VideoThumbnail } from "../components/VideoThumbnail";
 
 interface VideoRow {
   id: string;
@@ -45,6 +46,8 @@ export function Videos() {
   const [registering, setRegistering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [deletingVideo, setDeletingVideo] = useState<VideoRow | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   async function load() {
     const d = await apiGet<VideosResponse>("/internal/videos");
@@ -66,6 +69,28 @@ export function Videos() {
     e.stopPropagation();
     setBusy(video.id);
     await apiPost(`/internal/videos/${video.id}/restore`, {});
+    await load();
+    setBusy(null);
+  }
+
+  function openDeleteConfirm(e: React.MouseEvent, video: VideoRow) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeletingVideo(video);
+    setDeleteConfirmText("");
+  }
+
+  async function confirmDelete() {
+    if (!deletingVideo || deleteConfirmText !== deletingVideo.display_code) return;
+    setBusy(deletingVideo.id);
+    const result = await apiPost<{ stream_deleted: boolean }>(`/internal/videos/${deletingVideo.id}/delete`, {});
+    if (!result.stream_deleted) {
+      window.alert(
+        "The video was deleted here, but Cloudflare Stream refused to delete the underlying file (a known permission gap on the current API token). It's still sitting on Stream and will keep being billed until someone deletes it there manually or the token's permissions are fixed.",
+      );
+    }
+    setDeletingVideo(null);
+    setDeleteConfirmText("");
     await load();
     setBusy(null);
   }
@@ -118,21 +143,32 @@ export function Videos() {
                 to={`/videos/${v.id}`}
                 className={`rounded-card border border-line bg-surface p-4 transition-colors hover:border-line-strong ${archived ? "opacity-50" : ""}`}
               >
-                <div className="mb-2 flex aspect-video items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
-                  {v.display_code}
-                </div>
+                <VideoThumbnail
+                  videoId={v.id}
+                  displayCode={v.display_code}
+                  className="mb-2 aspect-video w-full rounded-[12px]"
+                />
                 <div className="text-sm font-medium text-ink">{v.title}</div>
                 <div className="mb-2 text-xs text-muted">
                   {v.category} · {formatDuration(v.duration_seconds)} · {v.status}
                 </div>
                 {archived ? (
-                  <button
-                    onClick={(e) => restoreVideoTile(e, v)}
-                    disabled={busy === v.id}
-                    className="text-xs font-medium text-primary-press hover:underline disabled:opacity-50"
-                  >
-                    {busy === v.id ? "Restoring…" : "Restore"}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => restoreVideoTile(e, v)}
+                      disabled={busy === v.id}
+                      className="text-xs font-medium text-primary-press hover:underline disabled:opacity-50"
+                    >
+                      {busy === v.id ? "Restoring…" : "Restore"}
+                    </button>
+                    <button
+                      onClick={(e) => openDeleteConfirm(e, v)}
+                      disabled={busy === v.id}
+                      className="text-xs font-medium text-[#B42318] hover:underline disabled:opacity-50"
+                    >
+                      Delete forever
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={(e) => removeVideo(e, v)}
@@ -209,6 +245,44 @@ export function Videos() {
             })}
           </ul>
         </section>
+      )}
+
+      {deletingVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-card border border-line bg-surface p-6 shadow-md">
+            <h2 className="mb-2 text-h3 font-semibold text-ink">Delete "{deletingVideo.title}" forever?</h2>
+            <p className="mb-4 text-sm text-body">
+              This permanently deletes the video, its captions, entitlement history, and all play/usage records —
+              and removes the underlying file from Cloudflare Stream. This cannot be undone.
+            </p>
+            <label className="mb-1 block text-label uppercase text-muted">
+              Type <span className="font-mono text-ink">{deletingVideo.display_code}</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoFocus
+              className={`mb-4 w-full ${inputClass}`}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeletingVideo(null)}
+                disabled={busy === deletingVideo.id}
+                className="rounded-input border border-line-strong px-3 py-1.5 text-sm text-body hover:bg-surface-sunken disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteConfirmText !== deletingVideo.display_code || busy === deletingVideo.id}
+                className="rounded-input border border-[#FECDCA] bg-[#B42318] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#912018] disabled:opacity-50"
+              >
+                {busy === deletingVideo.id ? "Deleting…" : "Delete forever"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
