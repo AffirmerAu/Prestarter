@@ -150,7 +150,8 @@ export function Videos() {
                 />
                 <div className="text-sm font-medium text-ink">{v.title}</div>
                 <div className="mb-2 text-xs text-muted">
-                  {v.category} · {formatDuration(v.duration_seconds)} · {v.status}
+                  {v.category} · {formatDuration(v.duration_seconds)}
+                  {v.status !== "draft" && ` · ${v.status}`}
                 </div>
                 {archived ? (
                   <div className="flex items-center gap-3">

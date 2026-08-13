@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiGet, apiPost, assetUrl } from "../lib/api";
+import { VideoThumbnail } from "../components/VideoThumbnail";
 
 // Admin export endpoints require the Authorization header, so a plain <a href> would just
 // 401 — fetch with auth, open the resulting blob URL instead. The tab must be opened
@@ -256,54 +257,60 @@ export function ClientDetail() {
 
       <section className={cardClass}>
         <h2 className={cardHeaderClass}>Entitlements &amp; links</h2>
-        <ul className="mb-4 divide-y divide-[#F2F4F7]">
+        <div className="mb-4 space-y-3">
           {data.entitlements.map((e) => {
             const active = isActiveEntitlement(e.effective_to);
             return (
-              <li key={e.id} className="flex items-center justify-between py-2 text-sm">
-                <div>
-                  <div className="font-medium text-ink">
-                    {e.videos.title}
-                    {!active && (
-                      <span className="ml-2 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-xs font-semibold text-[#475467]">
-                        removed
-                      </span>
-                    )}
+              <div
+                key={e.id}
+                className={`rounded-card border border-line bg-surface p-4 ${active ? "" : "opacity-50"}`}
+              >
+                <div className="flex items-center gap-4">
+                  <VideoThumbnail
+                    videoId={e.video_id}
+                    displayCode={e.videos.display_code}
+                    className="aspect-video w-32 shrink-0 rounded-[12px]"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-ink">
+                      {e.videos.title}
+                      {!active && (
+                        <span className="ml-2 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-xs font-semibold text-[#475467]">
+                          removed
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted">{e.videos.display_code}</div>
                   </div>
-                  <div className="text-muted">{e.videos.display_code}</div>
+                  {active && (
+                    <div className="flex gap-2">
+                      {activeKey && (
+                        <>
+                          <button
+                            onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.svg`)}
+                            className={secondaryBtnClass}
+                          >
+                            QR (SVG)
+                          </button>
+                          <button
+                            onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.png`)}
+                            className={secondaryBtnClass}
+                          >
+                            QR (PNG)
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => removeVideo(e.id, e.videos.title)} disabled={busy} className={destructiveBtnClass}>
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {active && (
-                  <div className="flex items-center gap-3">
-                    {activeKey && (
-                      <>
-                        <button
-                          className="text-muted hover:underline"
-                          onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.svg`)}
-                        >
-                          QR (SVG)
-                        </button>
-                        <button
-                          className="text-muted hover:underline"
-                          onClick={() => openAsset(`/internal/clients/${client.id}/videos/${e.video_id}/qr.png`)}
-                        >
-                          QR (PNG)
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => removeVideo(e.id, e.videos.title)}
-                      disabled={busy}
-                      className="text-[#B42318] hover:underline disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </li>
+              </div>
             );
           })}
-          {data.entitlements.length === 0 && <li className="py-2 text-sm text-muted">No entitlements yet.</li>}
-        </ul>
+          {data.entitlements.length === 0 && <p className="text-sm text-muted">No entitlements yet.</p>}
+        </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <select

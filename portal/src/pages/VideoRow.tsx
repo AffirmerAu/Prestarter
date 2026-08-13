@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { openAsset, WORKER_ORIGIN } from "../lib/api";
+import { VideoThumbnail } from "../components/VideoThumbnail";
 
 interface Video {
   id: string;
@@ -84,9 +85,11 @@ export function VideoRow({
   return (
     <div className="rounded-card border border-line bg-surface p-4">
       <div className="flex items-center gap-4">
-        <div className="flex aspect-video w-32 shrink-0 items-center justify-center rounded-[12px] bg-surface-muted text-xs text-subtle">
-          {video.display_code}
-        </div>
+        <VideoThumbnail
+          videoId={video.id}
+          displayCode={video.display_code}
+          className="aspect-video w-32 shrink-0 rounded-[12px]"
+        />
         <div className="flex-1">
           <div className="font-medium text-ink">{video.title}</div>
           <div className="text-sm text-muted">
