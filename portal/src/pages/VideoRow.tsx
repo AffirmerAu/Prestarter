@@ -84,20 +84,20 @@ export function VideoRow({
 
   return (
     <div className="rounded-card border border-line bg-surface p-4">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <VideoThumbnail
           videoId={video.id}
           displayCode={video.display_code}
-          className="aspect-video w-32 shrink-0 rounded-[12px]"
+          className="aspect-video w-full rounded-[12px] sm:w-32 sm:shrink-0"
         />
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="font-medium text-ink">{video.title}</div>
           <div className="text-sm text-muted">
             {formatDuration(video.duration_seconds)}
             {languages.length > 0 && ` · ${languages.map((l) => l.label_native).join(", ")}`}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setPlaying((p) => !p)}
             disabled={!accessKey}
@@ -134,7 +134,7 @@ export function VideoRow({
       {expanded && (
         <div className="mt-4 space-y-3 border-t border-line pt-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded-input border border-line-strong text-sm">
+            <div className="flex flex-wrap rounded-input border border-line-strong text-sm">
               {(["watch", "embed", "manifest"] as Format[]).map((f) => (
                 <button
                   key={f}

@@ -116,22 +116,22 @@ export function Portal() {
   return (
     <div className="min-h-screen bg-surface-sunken">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-4xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-3">
-            <img src="/brand/logo-horizontal.png" alt="Prestarter" className="h-[60px] w-auto" />
+            <img src="/brand/logo-horizontal.png" alt="Prestarter" className="h-10 w-auto shrink-0 sm:h-[60px]" />
             <span className="text-sm text-muted">by Affirmer</span>
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="font-medium text-ink">{client.name}</span>
-            <span className="text-muted">{session?.user.email}</span>
-            <button onClick={signOut} className="text-subtle hover:text-body">
+            <span className="min-w-0 truncate text-muted">{session?.user.email}</span>
+            <button onClick={signOut} className="shrink-0 text-subtle hover:text-body">
               Sign out
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className={`mb-6 rounded-[12px] border p-5 text-sm ${BANNER_TONE_CLASSES[banner.tone]}`}>
           <span className="font-bold">{banner.word}</span> <span className="font-normal">{banner.detail}</span>
         </div>
