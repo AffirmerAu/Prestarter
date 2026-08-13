@@ -103,12 +103,32 @@ if (baseline.status === 200 && baseline.body?.token) {
 }
 
 // --- AT6: no entitlement for this video ---
-const [otherVideo] = (await rest("videos?stream_uid=neq." + encodeURIComponent(devVars.STAGE1_VIDEO_UID) + "&limit=1")).body ?? [];
-if (otherVideo) {
-  const noEnt = await requestToken(otherVideo.id, a.key);
+// Uses its own disposable, deliberately-never-entitled video rather than picking "any
+// non-stage-1 video" out of the shared catalogue — that used to work when the catalogue only
+// ever held the stage-1 fixture, but broke the moment any other real video legitimately
+// became entitled to the Acme fixture client through ordinary use of the product (which is
+// exactly what happened: this caught the same "pick an arbitrary shared video" fragility
+// twice in one session before this fix). checkEntitlement() only needs the videos row to
+// exist — it fails on the entitlement check itself, long before ever needing a real Stream
+// asset — so a synthetic stream_uid is fine here, same pattern as at-archive-video.mjs /
+// at-delete-video.mjs.
+{
+  const unentitledVideo = (
+    await rest("videos", {
+      method: "POST",
+      body: JSON.stringify({
+        display_code: `AT6-UNENTITLED-${Date.now()}`,
+        title: "AT6 deliberately-unentitled video",
+        duration_seconds: 60,
+        category: "test",
+        stream_uid: `at6-unentitled-fake-${Date.now()}`,
+        status: "draft",
+      }),
+    })
+  ).body?.[0];
+  const noEnt = await requestToken(unentitledVideo.id, a.key);
   check("AT6: no entitlement for video is refused", noEnt.status === 403, JSON.stringify(noEnt.body));
-} else {
-  console.log("SKIP  AT6: no second video in the catalogue to test non-entitlement against");
+  await rest(`videos?id=eq.${unentitledVideo.id}`, { method: "DELETE" });
 }
 
 // --- AT5: play after term_end ---
