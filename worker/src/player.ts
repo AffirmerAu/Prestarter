@@ -111,18 +111,20 @@ export function renderPlayerPage(videoId: string, accessKey: string, lang: strin
     display: block;
     background: var(--ps-ink);
   }
-  /* Watermark — spec section 7, position/size/content fixed for anti-piracy traceability.
+  /* Watermark — spec section 7, content and general top-left placement fixed for anti-piracy
+     traceability; exact size/inset are a deliberate visual call (user-requested: smaller,
+     closer to the corner), not a spec requirement — kept well within acceptance criterion 21
+     ("remains legible at 1080p, 720p and on a mobile viewport"), not shrunk further than that.
      Font and colour substituted per the brand design spec (section 0's explicit exception to
-     "do not change"); position, size logic and content are untouched. Note: substituting
-     Poppins here does cost the watermark its monospace digit alignment as the clock ticks —
-     a real, deliberate trade-off, not an oversight. */
+     "do not change"). Note: substituting Poppins here does cost the watermark its monospace
+     digit alignment as the clock ticks — a real, deliberate trade-off, not an oversight. */
   #watermark {
     position: absolute;
-    top: 16px;
-    left: 16px;
+    top: 8px;
+    left: 8px;
     color: var(--ps-white-62);
     font-family: var(--ps-font);
-    font-size: 13px;
+    font-size: 11px;
     line-height: 1.3;
     text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
     pointer-events: none;
